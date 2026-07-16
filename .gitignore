@@ -1,0 +1,11 @@
+# Secrets
+.env
+
+# Personal data
+input/
+
+# Generated runtime artifacts
+output/
+
+__pycache__/
+*.pyc
