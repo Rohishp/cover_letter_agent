@@ -1,34 +1,66 @@
-from pathlib import Path
-
 from dotenv import load_dotenv
 from openai import OpenAI
 from pypdf import PdfReader
-
+from io import BytesIO
+import boto3
 from models.cv_schema import ParsedCV
-
 
 load_dotenv()
 client = OpenAI()
 
+S3_REGION = "eu-central-1"
 
-def extract_pdf_text(pdf_path: str) -> str:
-    path = Path(pdf_path)
+def extract_pdf_text(
+    reader: PdfReader,
+) -> str:
+    """
+    Extract text from an already opened PDF reader.
 
-    if not path.exists():
-        raise FileNotFoundError(f"CV PDF not found: {path}")
+    Works with:
+    - local PDF files
+    - PDFs loaded from S3
+    """
 
-    reader = PdfReader(str(path))
+    pages = []
 
-    all_text = ""
+    for page in reader.pages:
+        text = page.extract_text()
 
-    for page_number, page in enumerate(reader.pages, start=1):
-        page_text = page.extract_text() or ""
-        all_text += f"\n--- Page {page_number} ---\n{page_text}"
+        if text:
+            pages.append(text)
 
-    if not all_text.strip():
-        raise ValueError("No text could be extracted from the CV PDF.")
+    return "\n".join(pages)
 
-    return all_text
+
+def load_cv_from_s3(
+    bucket: str,
+    key: str,
+) -> str:
+    """
+    Load CV PDF from S3 and return extracted text.
+
+    Example:
+        bucket = "cover-letter-agent"
+        key = "resume/Rohish_Resume.pdf"
+    """
+
+    s3 = boto3.client(
+        "s3",
+        region_name=S3_REGION,
+    )
+
+    response = s3.get_object(
+        Bucket=bucket,
+        Key=key,
+    )
+
+    pdf_bytes = response["Body"].read()
+
+    reader = PdfReader(
+        BytesIO(pdf_bytes)
+    )
+
+    return extract_pdf_text(reader)
 
 
 def parse_cv(text: str) -> ParsedCV:

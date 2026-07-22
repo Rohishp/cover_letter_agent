@@ -1,5 +1,3 @@
-import pyperclip
-
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -9,20 +7,6 @@ from models.jd_schema import ParsedJD
 load_dotenv()
 client = OpenAI()
 
-
-def read_clipboard_windows() -> str:
-    """
-    Read the copied job description from the Windows clipboard.
-    """
-
-    text = pyperclip.paste()
-
-    if not text or not text.strip():
-        raise ValueError(
-            "Clipboard is empty. Copy the complete job description first."
-        )
-
-    return text.strip()
 
 
 def parse_jd(raw_jd: str) -> ParsedJD:

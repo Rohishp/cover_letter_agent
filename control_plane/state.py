@@ -1,7 +1,6 @@
 import json
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -11,6 +10,8 @@ from models.jd_schema import ParsedJD
 from models.match_schema import MatchAnalysis
 from models.eval_schema import EvalResult, CoverLetterAttempt
 
+import boto3
+from botocore.exceptions import ClientError
 
 PipelineStatus = Literal[
     "created",
@@ -29,6 +30,14 @@ PipelineStatus = Literal[
     "rejected",
     "failed",
 ]
+
+S3_BUCKET = "cover-letter-agent"
+S3_REGION = "eu-central-1"
+
+s3 = boto3.client(
+    "s3",
+    region_name=S3_REGION,
+)
 
 
 class CoverLetterState(BaseModel):
@@ -74,6 +83,8 @@ class CoverLetterState(BaseModel):
     eval_feedback: str | None = None
 
     retry_count: int = 0
+
+    cover_letter_s3_key: str | None = None
 
     cover_letter_attempts: list[CoverLetterAttempt] = Field(
         default_factory=list
@@ -170,6 +181,7 @@ class CoverLetterState(BaseModel):
                 else None
             ),
             "eval_score": self.eval_score,
+            "cover_letter_s3_key": self.cover_letter_s3_key,
             "retry_count": self.retry_count,
             "attempt_count": len(self.cover_letter_attempts),
             "application_document_requirements": (
@@ -180,65 +192,83 @@ class CoverLetterState(BaseModel):
         }
 
 
-STATES_DIR = Path("output/states")
 
+def save_state(state: CoverLetterState) -> str:
+    """
+    Save pipeline state to S3.
+    """
+    state.touch()
+    key = f"states/{state.run_id}.json"
 
-def save_state(
-    state: CoverLetterState,
-) -> Path:
-    STATES_DIR.mkdir(
-        parents=True,
-        exist_ok=True,
+    json_string = json.dumps(
+        state.model_dump(),
+        indent=2,
+        ensure_ascii=False,
+        default=str,
     )
 
-    path = STATES_DIR / f"{state.run_id}.json"
+    s3.put_object(
+        Bucket=S3_BUCKET,
+        Key=key,
+        Body=json_string.encode("utf-8"),
+    )
 
-    with open(path, "w", encoding="utf-8") as file:
-        json.dump(
-            state.model_dump(),
-            file,
-            indent=2,
-            ensure_ascii=False,
-            default=str,
+    return key
+
+
+def load_state(run_id: str) -> CoverLetterState:
+    """
+    Load pipeline state from S3.
+    """
+
+    key = f"states/{run_id}.json"
+
+    try:
+        response = s3.get_object(
+            Bucket=S3_BUCKET,
+            Key=key,
         )
 
-    return path
+    except ClientError as e:
 
+        if e.response["Error"]["Code"] == "NoSuchKey":
+            raise FileNotFoundError(
+                f"No saved state found for run_id: {run_id}"
+            )
 
-def load_state(
-    run_id: str,
-) -> CoverLetterState:
-    path = STATES_DIR / f"{run_id}.json"
+        raise
 
-    if not path.exists():
-        raise FileNotFoundError(
-            f"No saved state found for run_id: {run_id}"
-        )
+    json_string = (
+        response["Body"]
+        .read()
+        .decode("utf-8")
+    )
 
-    with open(path, "r", encoding="utf-8") as file:
-        data = json.load(file)
+    data = json.loads(json_string)
 
     return CoverLetterState(**data)
 
 
 def list_states() -> list[dict]:
-    if not STATES_DIR.exists():
+    response = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix="states/")
+
+    if "Contents" not in response:
         return []
 
     summaries = []
 
-    for path in sorted(
-        STATES_DIR.glob("*.json"),
-        reverse=True,
-    ):
+    for obj in sorted(response["Contents"], key=lambda o: o["LastModified"], reverse=True):
         try:
-            with open(path, "r", encoding="utf-8") as file:
-                data = json.load(file)
-
-            state = CoverLetterState(**data)
+            run_id = obj["Key"].removeprefix("states/").removesuffix(".json")
+            state = load_state(run_id)
             summaries.append(state.summary)
-
-        except Exception:
+        except ClientError:
+            continue
+        except ValueError:
+            continue
+        except TypeError:
+            continue
+        except FileNotFoundError:
             continue
 
     return summaries
