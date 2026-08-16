@@ -66,6 +66,8 @@ def load_cv_from_s3(
 def parse_cv(text: str) -> ParsedCV:
     response = client.beta.chat.completions.parse(
         model="gpt-4o",
+        temperature=0,
+        seed=42,
         messages=[
             {
                 "role": "system",

@@ -75,6 +75,8 @@ def compare_cv_to_jd(
 
     response = client.beta.chat.completions.parse(
         model="gpt-4o",
+        temperature=0,
+        seed=42,
         messages=[
             {
                 "role": "system",

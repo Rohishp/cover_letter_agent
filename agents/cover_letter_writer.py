@@ -31,6 +31,8 @@ def write_cover_letter(
 
     response = client.chat.completions.create(
         model="gpt-4o",
+        temperature=0.7,
+        seed=42,
         messages=[
             {
                 "role": "system",

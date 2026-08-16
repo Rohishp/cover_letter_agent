@@ -16,6 +16,8 @@ def parse_jd(raw_jd: str) -> ParsedJD:
 
     response = client.beta.chat.completions.parse(
         model="gpt-4o",
+        temperature=0,
+        seed=42,
         messages=[
             {
                 "role": "system",

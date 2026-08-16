@@ -32,6 +32,7 @@ MATCH_BASE_THRESHOLD = 65
 MATCH_CORE_THRESHOLD = 60
 
 EVAL_PASS_THRESHOLD = 70
+EVAL_HOOK_MIN_SCORE = 13
 MAX_COVER_LETTER_RETRIES = 2
 
 
@@ -439,6 +440,8 @@ jd_text: str,
             if (
                 state.eval_score
                 >= EVAL_PASS_THRESHOLD
+                and eval_result.hook.score
+                >= EVAL_HOOK_MIN_SCORE
             ):
 
                 state.update_status(
