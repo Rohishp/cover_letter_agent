@@ -65,57 +65,6 @@ def should_generate_cover_letter(
     )
 
 
-
-def print_match_breakdown(
-match: MatchAnalysis,
-) -> None:
-
-    print("Deterministic score breakdown:")
-
-    print(
-        f"- core_must_have_score: "
-        f"{match.core_must_have_score} "
-        f"/ required {MATCH_CORE_THRESHOLD}"
-    )
-
-    print(
-        f"- eligibility_score: "
-        f"{match.eligibility_score}"
-    )
-
-    print(
-        f"- supporting_score: "
-        f"{match.supporting_score}"
-    )
-
-    print(
-        f"- base_score: "
-        f"{match.base_score} "
-        f"/ required {MATCH_BASE_THRESHOLD}"
-    )
-
-    print(
-        f"- nice_to_have_score: "
-        f"{match.nice_to_have_score} "
-        "(bonus only)"
-    )
-
-    print(
-        f"- overall_score with bonus: "
-        f"{match.overall_score}"
-    )
-
-    print()
-
-    print("LLM recommendation (informational only):")
-
-    print(
-        f"- recommendation: "
-        f"{match.recommendation}"
-    )
-
-    print()
-
 def run_pipeline(
 cv_path: str,
 jd_text: str,
@@ -144,9 +93,7 @@ jd_text: str,
 
     try:
 
-        ###########################################################
         # 1. LOAD CV
-        ###########################################################
 
         state.raw_cv_text = load_cv_from_s3(
         bucket="cover-letter-agent",
@@ -157,9 +104,7 @@ jd_text: str,
 
         save_state(state)
 
-        ###########################################################
         # 2. PARSE CV
-        ###########################################################
 
         state.parsed_cv = parse_cv(
             state.raw_cv_text
@@ -169,9 +114,7 @@ jd_text: str,
 
         save_state(state)
 
-        ###########################################################
         # 3. LOAD JD
-        ###########################################################
 
         state.raw_jd_text = jd_text.strip()
 
@@ -179,9 +122,7 @@ jd_text: str,
 
         save_state(state)
 
-        ###########################################################
         # 4. JD CACHE
-        ###########################################################
 
         state.jd_cache_key = create_jd_cache_key(
             state.raw_jd_text
@@ -197,8 +138,6 @@ jd_text: str,
 
             parsed_jd = cached_jd
 
-            print("JD PARSE CACHE HIT.")
-
         else:
 
             state.jd_cache_hit = False
@@ -207,15 +146,9 @@ jd_text: str,
                 state.raw_jd_text
             )
 
-            cache_path = save_cached_jd(
+            save_cached_jd(
                 raw_jd=state.raw_jd_text,
                 parsed_jd=parsed_jd,
-            )
-
-            print("JD PARSE CACHE MISS.")
-            print(
-                f"Parsed JD cached at: "
-                f"{cache_path}"
             )
 
         state.parsed_jd = parsed_jd
@@ -228,9 +161,7 @@ jd_text: str,
 
         save_state(state)
 
-        ###########################################################
         # 5. VALIDATE JD
-        ###########################################################
 
         if not validate_jd_input_quality(state):
 
@@ -244,9 +175,7 @@ jd_text: str,
 
         save_state(state)
 
-        ###########################################################
         # 6. MATCH CV AGAINST JD
-        ###########################################################
 
         state.update_status(
             "matching"
@@ -259,18 +188,14 @@ jd_text: str,
             parsed_jd=state.parsed_jd,
         )
 
-        ###########################################################
         # 7. VALIDATE MATCH COVERAGE
-        ###########################################################
 
         validate_match_coverage(
             parsed_jd=state.parsed_jd,
             match=match_analysis,
         )
 
-        ###########################################################
         # 8. DETERMINISTIC SCORING
-        ###########################################################
 
         match_analysis = (
             compute_deterministic_match_scores(
@@ -286,9 +211,7 @@ jd_text: str,
 
         save_state(state)
 
-        ###########################################################
         # 9. MATCH GATE
-        ###########################################################
 
         if not should_generate_cover_letter(
             match_analysis
@@ -300,35 +223,11 @@ jd_text: str,
 
             save_state(state)
 
-            print()
-
-            print(
-                "MATCH REJECTED:"
-            )
-
-            print_match_breakdown(
-                match_analysis
-            )
-
             return state
 
-        ###########################################################
         # MATCH PASSED
-        ###########################################################
 
-        print()
-
-        print(
-            "MATCH PASSED."
-        )
-
-        print_match_breakdown(
-            match_analysis
-        )
-
-        ###########################################################
         # 10. COVER LETTER LOOP
-        ###########################################################
 
         while (
             state.retry_count
@@ -339,16 +238,7 @@ jd_text: str,
                 state.retry_count + 1
             )
 
-            print()
-
-            print(
-                "Generating cover letter "
-                f"attempt {attempt_number}..."
-            )
-
-            ###################################################
             # WRITE
-            ###################################################
 
             state.update_status(
                 "writing_cover_letter"
@@ -371,9 +261,7 @@ jd_text: str,
 
             save_state(state)
 
-            ###################################################
             # EVALUATE
-            ###################################################
 
             state.update_status(
                 "evaluating_cover_letter"
@@ -408,9 +296,7 @@ jd_text: str,
                 eval_result.feedback_text
             )
 
-            ###################################################
             # SAVE ATTEMPT
-            ###################################################
 
             state.cover_letter_attempts.append(
 
@@ -428,14 +314,7 @@ jd_text: str,
 
             save_state(state)
 
-            print(
-                f"Evaluation score: "
-                f"{state.eval_score}"
-                f"/{EVAL_PASS_THRESHOLD}"
-            )
-            ###################################################
             # PASSED EVALUATION
-            ###################################################
 
             if (
                 state.eval_score
@@ -459,45 +338,9 @@ jd_text: str,
 
                 save_state(state)
 
-                print()
-
-                print(
-                    "COVER LETTER ACCEPTED."
-                )
-
-                print(
-                    f"Saved to S3: {cover_letter_key}"
-                )
-
-                print()
-
-                if (
-                    state.application_document_requirements
-                ):
-
-                    print(
-                        "Required application documents:"
-                    )
-
-                    for requirement in (
-                        state.application_document_requirements
-                    ):
-
-                        print(
-                            f"- {requirement}"
-                        )
-
-                    print()
-
-                print(
-                    state.cover_letter
-                )
-
                 return state
 
-            ###################################################
             # FAILED BUT RETRY AVAILABLE
-            ###################################################
 
             if (
                 state.retry_count
@@ -509,27 +352,7 @@ jd_text: str,
 
             save_state(state)
 
-            print()
-
-            print(
-                "Evaluation failed."
-            )
-
-            print(
-                f"Retry "
-                f"{state.retry_count}"
-                f"/"
-                f"{MAX_COVER_LETTER_RETRIES}"
-            )
-
-            print(
-                "Using evaluator feedback "
-                "for regeneration."
-            )
-
-        ###########################################################
         # MAXIMUM RETRIES EXHAUSTED
-        ###########################################################
 
         state.set_error(
             "Cover letter failed evaluation after "
@@ -539,29 +362,9 @@ jd_text: str,
 
         save_state(state)
 
-        print()
-
-        print(
-            "COVER LETTER FAILED."
-        )
-
-        print()
-
-        print(
-            "Final evaluator feedback:"
-        )
-
-        print(
-            state.eval_feedback
-        )
-
-        print()
-
         return state
 
-    ###############################################################
     # UNEXPECTED EXCEPTION
-    ###############################################################
 
     except Exception as error:
 
@@ -571,19 +374,4 @@ jd_text: str,
 
         save_state(state)
 
-        print()
-
-        print(
-            "PIPELINE FAILED."
-        )
-
-        print(
-            f"Error: {error}"
-        )
-
-        print(
-            f"Run ID: {state.run_id}"
-        )
-
         return state
-

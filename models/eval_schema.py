@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from guidelines import GENERIC_HOOK_EXAMPLES
+
 
 class CriterionScore(BaseModel):
     score: int = Field(
@@ -16,8 +18,9 @@ class EvalResult(BaseModel):
     hook: CriterionScore = Field(
         description=(
             "Score the opening from 0 to 20. "
-            "0-5: generic application boilerplate such as 'I am writing to apply', "
-            "'I am writing to express my interest', or equivalent wording. "
+            "0-5: generic application boilerplate such as "
+            f"{', '.join(repr(example) for example in GENERIC_HOOK_EXAMPLES)}, "
+            "or equivalent wording. "
             "6-12: mentions the role but remains generic and reusable. "
             "13-17: connects specific candidate evidence to the role mission. "
             "18-20: distinctive, concise, evidence-based, and highly role-specific."

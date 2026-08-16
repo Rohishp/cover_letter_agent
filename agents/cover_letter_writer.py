@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from guidelines import GENERIC_HOOK_EXAMPLES
 from models.cv_schema import ParsedCV
 from models.jd_schema import ParsedJD
 from models.match_schema import MatchAnalysis
@@ -19,6 +20,10 @@ def write_cover_letter(
     """
     Generate or revise a cover letter using approved evidence only.
     """
+
+    generic_hook_bullets = "\n".join(
+        f"- {example}" for example in GENERIC_HOOK_EXAMPLES
+    )
 
     feedback_block = ""
 
@@ -43,9 +48,7 @@ def write_cover_letter(
                     "work authorization, education, or company facts.\n\n"
 
                     "Do not begin with generic wording such as:\n"
-                    "- I am writing to apply\n"
-                    "- I am writing to express my interest\n"
-                    "- I am excited to apply\n\n"
+                    f"{generic_hook_bullets}\n\n"
 
                     "Begin with a role-specific, evidence-based connection between the "
                     "candidate and the role's mission."

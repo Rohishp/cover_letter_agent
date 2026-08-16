@@ -1,13 +1,5 @@
+from guidelines import GENERIC_HOOK_PREFIXES
 from models.eval_schema import EvalResult
-
-
-GENERIC_HOOK_PREFIXES = (
-    "i am writing to apply",
-    "i am writing to express my interest",
-    "i am writing to express my keen interest",
-    "i am excited to apply",
-    "i wish to apply",
-)
 
 
 def calculate_eval_total(

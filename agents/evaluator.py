@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from guidelines import GENERIC_HOOK_RULE
 from models.cv_schema import ParsedCV
 from models.jd_schema import ParsedJD
 from models.eval_schema import EvalResult
@@ -37,9 +38,7 @@ def evaluate_cover_letter(
                     "4. Zero resume duplication\n"
                     "5. CTA\n\n"
 
-                    "A generic opening such as 'I am writing to apply', "
-                    "'I am writing to express my interest', or equivalent wording "
-                    "must receive a hook score of 5 or lower.\n\n"
+                    f"{GENERIC_HOOK_RULE}\n\n"
 
                     "Use the parsed CV for proof-over-pitch and resume-duplication checks. "
                     "Use the parsed JD for hook relevance and keyword alignment. "
