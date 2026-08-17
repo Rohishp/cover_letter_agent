@@ -1,10 +1,14 @@
+import json
 import sys
+from datetime import date, datetime
 from pathlib import Path
 
 import pyperclip
 
 from pipeline import run_pipeline
+from control_plane.application_paths import resolve_application_dir
 from control_plane.reporting import (
+    build_cover_letter_run_summary,
     print_jd_cache_status,
     print_match_breakdown,
     print_rejection_report,
@@ -64,13 +68,28 @@ def main() -> None:
 
     report(state)
 
+    company_name = state.parsed_jd.company_name if state.parsed_jd else None
+    job_title = state.parsed_jd.job_title if state.parsed_jd else None
+    out_dir = resolve_application_dir(company_name, job_title, date.today())
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    (out_dir / "jd.txt").write_text(jd_text, encoding="utf-8")
+
+    summary = {
+        "generated_at": datetime.now().isoformat(),
+        "company_name": company_name,
+        "job_title": job_title,
+        "cover_letter": build_cover_letter_run_summary(state),
+    }
+    (out_dir / "run.json").write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
     if state.cover_letter:
-        out_path = Path("output") / f"{state.run_id}.txt"
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(state.cover_letter, encoding="utf-8")
+        (out_dir / "cover_letter.txt").write_text(state.cover_letter, encoding="utf-8")
 
         print()
-        print(f"Also written to: {out_path}")
+        print(f"Also written to: {out_dir / 'cover_letter.txt'}")
 
 
 if __name__ == "__main__":
