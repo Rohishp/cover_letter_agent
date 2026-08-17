@@ -1,5 +1,6 @@
 from control_plane.jd_cache import get_jd_cache_key
 from control_plane.state import CoverLetterState
+from control_plane import storage
 
 from pipeline import (
     MATCH_BASE_THRESHOLD,
@@ -97,7 +98,8 @@ def print_final_result(state: CoverLetterState) -> None:
     if state.status == "completed":
         print()
         print("COVER LETTER ACCEPTED.")
-        print(f"Saved to S3: {state.cover_letter_s3_key}")
+        backend = state.storage_backend or storage.backend_name()
+        print(f"Saved ({backend}): {state.cover_letter_key}")
         print()
 
         if state.application_document_requirements:
@@ -132,3 +134,44 @@ def print_final_result(state: CoverLetterState) -> None:
     print("PIPELINE FAILED.")
     print(f"Error: {state.error}")
     print(f"Run ID: {state.run_id}")
+
+
+COVER_LETTER_MODEL_SETTINGS = {
+    "matcher_model": "gpt-4o",
+    "matcher_temperature": 0,
+    "matcher_seed": 42,
+    "evaluator_model": "gpt-4o",
+    "evaluator_temperature": 0,
+    "evaluator_seed": 42,
+    "writer_model": "gpt-4o",
+    "writer_temperature": 0.7,
+    "writer_seed": 42,
+}
+
+
+def build_cover_letter_run_summary(state: CoverLetterState) -> dict:
+    """
+    JSON-able summary of one cover-letter run: scores, status, and the
+    model settings used. Shared by run_local.py and apply.py so
+    run.json's shape is consistent regardless of entry point.
+    """
+
+    match = state.match_analysis
+
+    return {
+        "run_id": state.run_id,
+        "status": state.status,
+        "match_scores": {
+            "core_must_have_score": match.core_must_have_score if match else None,
+            "eligibility_score": match.eligibility_score if match else None,
+            "supporting_score": match.supporting_score if match else None,
+            "nice_to_have_score": match.nice_to_have_score if match else None,
+            "base_score": match.base_score if match else None,
+            "overall_score": match.overall_score if match else None,
+        },
+        "eval_score": state.eval_score,
+        "retry_count": state.retry_count,
+        "cover_letter_key": state.cover_letter_key,
+        "error": state.error,
+        "model_settings": COVER_LETTER_MODEL_SETTINGS,
+    }

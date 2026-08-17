@@ -10,6 +10,10 @@ def _backend() -> str:
     return os.environ.get("STORAGE_BACKEND", "local")
 
 
+def backend_name() -> str:
+    return _backend()
+
+
 def _local_root() -> Path:
     return Path(os.environ.get("LOCAL_DATA_DIR", "data"))
 

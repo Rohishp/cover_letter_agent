@@ -35,7 +35,7 @@ EXPERIENCE_BULLET_RANGE = (3, 5)
 EDUCATION_BULLET_RANGE = (0, 4)
 PROJECT_BULLET_RANGE = (2, 5)
 
-MIN_LAST_PAGE_FILL = 0.25
+MIN_LAST_PAGE_FILL = 0.5
 
 # Header block is always exactly 4 lines when nothing wraps: name, target
 # title, contact line 1 (location/email/phone), contact line 2 (links).
@@ -292,9 +292,10 @@ def _normalize_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def check_metric_density(docx_path: Path, *, content: CVContent, pdf_path: Path | None, **_) -> CheckResult:
-    if pdf_path is None:
-        return ("metric_density", None, "skipped: no PDF converter available")
+def page1_bullet_digit_stats(content: CVContent, pdf_path: Path) -> tuple[int, int]:
+    """
+    (bullets on page 1 that contain a digit, total bullets on page 1).
+    """
 
     import pymupdf as fitz
 
@@ -302,7 +303,7 @@ def check_metric_density(docx_path: Path, *, content: CVContent, pdf_path: Path 
 
     if pdf.page_count == 0:
         pdf.close()
-        return ("metric_density", None, "no pages")
+        return (0, 0)
 
     page1_text = _normalize_whitespace(pdf[0].get_text())
     pdf.close()
@@ -313,17 +314,26 @@ def check_metric_density(docx_path: Path, *, content: CVContent, pdf_path: Path 
     all_bullets.extend(content.coursework)
 
     page1_bullets = [b for b in all_bullets if _normalize_whitespace(b) in page1_text]
+    digit_bullets = [b for b in page1_bullets if any(ch.isdigit() for ch in b)]
 
-    if not page1_bullets:
+    return (len(digit_bullets), len(page1_bullets))
+
+
+def check_metric_density(docx_path: Path, *, content: CVContent, pdf_path: Path | None, **_) -> CheckResult:
+    if pdf_path is None:
+        return ("metric_density", None, "skipped: no PDF converter available")
+
+    digit_count, page1_count = page1_bullet_digit_stats(content, pdf_path)
+
+    if page1_count == 0:
         return ("metric_density", True, "0 bullets on page 1")
 
-    digit_bullets = [b for b in page1_bullets if any(ch.isdigit() for ch in b)]
-    fraction = len(digit_bullets) / len(page1_bullets)
+    fraction = digit_count / page1_count
 
     return (
         "metric_density",
         True,
-        f"{len(digit_bullets)}/{len(page1_bullets)} page-1 bullets contain a digit ({fraction:.0%})",
+        f"{digit_count}/{page1_count} page-1 bullets contain a digit ({fraction:.0%})",
     )
 
 

@@ -49,6 +49,7 @@ class CoverLetterState(BaseModel):
     )
 
     cv_path: str | None = None
+    storage_backend: str | None = None
     jd_source: Literal["clipboard", "argument"] | None = None
 
     raw_cv_text: str | None = None
@@ -74,7 +75,7 @@ class CoverLetterState(BaseModel):
 
     retry_count: int = 0
 
-    cover_letter_s3_key: str | None = None
+    cover_letter_key: str | None = None
 
     cover_letter_attempts: list[CoverLetterAttempt] = Field(
         default_factory=list
@@ -171,7 +172,7 @@ class CoverLetterState(BaseModel):
                 else None
             ),
             "eval_score": self.eval_score,
-            "cover_letter_s3_key": self.cover_letter_s3_key,
+            "cover_letter_key": self.cover_letter_key,
             "retry_count": self.retry_count,
             "attempt_count": len(self.cover_letter_attempts),
             "application_document_requirements": (

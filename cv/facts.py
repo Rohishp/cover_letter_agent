@@ -1,12 +1,66 @@
+import re
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field
 
 
 TODO_SENTINEL = "TODO"
+
+_LEGAL_SUFFIXES = {"gmbh", "ag", "inc", "llc", "ltd", "co", "corp", "plc", "sa"}
+
+_DEGREE_ABBREVIATIONS = {
+    "m.sc.": "msc",
+    "b.sc.": "bsc",
+    "ph.d.": "phd",
+    "m.a.": "ma",
+    "b.a.": "ba",
+}
+
+_STOPWORDS = {"of", "in", "and", "the", "for"}
+
+
+def _slugify(text: str) -> str:
+    text = text.strip().lower()
+    text = re.sub(r"[^a-z0-9]+", "-", text)
+    return text.strip("-")
+
+
+def _strip_legal_suffix(name: str) -> str:
+    words = name.split()
+
+    while words and _slugify(words[-1]) in _LEGAL_SUFFIXES:
+        words.pop()
+
+    return " ".join(words) or name
+
+
+def _slug_for_organisation(name: str) -> str:
+    return _slugify(_strip_legal_suffix(name))
+
+
+def _slug_for_degree(degree: str) -> str:
+    words = degree.split()
+
+    if words:
+        prefix = _DEGREE_ABBREVIATIONS.get(words[0].lower())
+
+        if prefix:
+            rest = [w for w in words[1:] if w.lower() not in _STOPWORDS]
+            acronym = "".join(w[0].lower() for w in rest if w[:1].isalpha())
+
+            if acronym:
+                return f"{prefix}-{acronym}"
+
+    return _slugify(degree)
+
+
+def _dedupe_id(candidate_id: str, seen: dict[str, int]) -> str:
+    count = seen.get(candidate_id, 0) + 1
+    seen[candidate_id] = count
+    return candidate_id if count == 1 else f"{candidate_id}-{count}"
 
 
 class Meta(BaseModel):
@@ -124,6 +178,30 @@ class Extras(BaseModel):
     volunteering: list[str]
 
 
+class FactRef(BaseModel):
+    """
+    A resolved, stable-ID reference to one referenceable item in the fact
+    base: an entry, a bullet within an entry, a skill group, coursework as
+    a whole, a certification, or a language.
+    """
+
+    id: str
+    kind: Literal[
+        "experience",
+        "experience_bullet",
+        "education",
+        "education_bullet",
+        "project",
+        "project_bullet",
+        "skill_group",
+        "coursework",
+        "certification",
+        "language",
+    ]
+    text: str
+    parent_id: str | None = None
+
+
 class CVFacts(BaseModel):
     meta: Meta
     personal: Personal
@@ -135,6 +213,89 @@ class CVFacts(BaseModel):
     skills: Skills
     coursework: Coursework
     extras: Extras
+
+    def by_id(self, item_id: str) -> FactRef | None:
+        return build_id_index(self).get(item_id)
+
+    def all_ids(self) -> list[str]:
+        return list(build_id_index(self).keys())
+
+
+def build_id_index(facts: CVFacts) -> dict[str, FactRef]:
+    """
+    Build every stable ID in the fact base.
+
+    IDs are deterministic for unchanged data: derived from each item's
+    position and a slug of its own text, not from any random or
+    time-based value.
+    """
+
+    index: dict[str, FactRef] = {}
+    seen: dict[str, int] = {}
+
+    for fact in facts.work_experience.entries:
+        entry_id = _dedupe_id(f"exp.{_slug_for_organisation(fact.organisation)}", seen)
+        index[entry_id] = FactRef(id=entry_id, kind="experience", text=fact.position)
+
+        for index_number, bullet in enumerate(fact.bullets, start=1):
+            bullet_id = f"{entry_id}.b{index_number}"
+            index[bullet_id] = FactRef(
+                id=bullet_id, kind="experience_bullet", text=bullet, parent_id=entry_id
+            )
+
+    for fact in facts.education.entries:
+        entry_id = _dedupe_id(f"edu.{_slug_for_degree(fact.degree)}", seen)
+        index[entry_id] = FactRef(id=entry_id, kind="education", text=fact.degree)
+
+        for index_number, bullet in enumerate(fact.bullets, start=1):
+            bullet_id = f"{entry_id}.b{index_number}"
+            index[bullet_id] = FactRef(
+                id=bullet_id, kind="education_bullet", text=bullet, parent_id=entry_id
+            )
+
+    for fact in facts.projects.entries:
+        entry_id = _dedupe_id(f"proj.{_slugify(fact.name)}", seen)
+        index[entry_id] = FactRef(id=entry_id, kind="project", text=fact.name)
+
+        for index_number, bullet in enumerate(fact.bullets, start=1):
+            bullet_id = f"{entry_id}.b{index_number}"
+            index[bullet_id] = FactRef(
+                id=bullet_id, kind="project_bullet", text=bullet, parent_id=entry_id
+            )
+
+    for group in facts.skills.groups:
+        group_id = _dedupe_id(f"skill.{_slugify(group.name)}", seen)
+        index[group_id] = FactRef(id=group_id, kind="skill_group", text=group.name)
+
+    if facts.coursework.items:
+        index["coursework"] = FactRef(
+            id="coursework",
+            kind="coursework",
+            text="; ".join(facts.coursework.items),
+        )
+
+    for cert in facts.certifications.entries:
+        cert_id = _dedupe_id(f"cert.{_slugify(cert.name)}", seen)
+        index[cert_id] = FactRef(id=cert_id, kind="certification", text=cert.name)
+
+    for language_fact in facts.languages.entries:
+        lang_id = _dedupe_id(f"lang.{_slugify(language_fact.language)}", seen)
+        index[lang_id] = FactRef(
+            id=lang_id,
+            kind="language",
+            text=f"{language_fact.language} ({language_fact.level})",
+        )
+
+    return index
+
+
+def ids_by_kind(facts: CVFacts, kind: str) -> list[str]:
+    """
+    IDs of the given kind, in the same order as the underlying fact list
+    (e.g. "experience" IDs in the same order as facts.work_experience.entries).
+    """
+
+    return [ref.id for ref in build_id_index(facts).values() if ref.kind == kind]
 
 
 def _find_todo_paths(value: Any, path: str = "") -> list[str]:

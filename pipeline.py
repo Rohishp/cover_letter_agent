@@ -23,6 +23,7 @@ save_state,
 from control_plane.cover_letter_storage import (
     save_cover_letter,
 )
+from control_plane import storage
 
 from models.eval_schema import CoverLetterAttempt
 from models.match_schema import MatchAnalysis
@@ -86,7 +87,8 @@ jd_text: str,
     """
 
     state = CoverLetterState(
-        cv_path=f"s3://cover-letter-agent/{cv_path}"
+        cv_path=cv_path,
+        storage_backend=storage.backend_name(),
     )
 
     save_state(state)
@@ -333,7 +335,7 @@ jd_text: str,
                     cover_letter=state.cover_letter,
                 )
 
-                state.cover_letter_s3_key = cover_letter_key
+                state.cover_letter_key = cover_letter_key
 
                 save_state(state)
 
