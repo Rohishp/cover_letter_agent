@@ -1,25 +1,13 @@
 import hashlib
 import json
 
-import boto3
-from botocore.exceptions import ClientError
-
+from control_plane import storage
 from models.jd_schema import ParsedJD
 
-
-S3_BUCKET = "cover-letter-agent"
-S3_REGION = "eu-central-1"
 
 JD_CACHE_PREFIX = "jd_cache"
 
 JD_PARSER_VERSION = "v2_application_documents"
-
-
-def get_s3():
-    return boto3.client(
-        "s3",
-        region_name=S3_REGION,
-    )
 
 
 def normalize_jd_text(raw_jd: str) -> str:
@@ -60,38 +48,19 @@ def get_jd_cache_key(raw_jd: str) -> str:
 
 def load_cached_jd(raw_jd: str) -> ParsedJD | None:
     """
-    Load a parsed JD from S3 cache.
+    Load a parsed JD from the cache.
 
     Returns None if no cache exists or the parser version changed.
     """
 
-    s3 = get_s3()
-
     key = get_jd_cache_key(raw_jd)
 
-    try:
-        response = s3.get_object(
-            Bucket=S3_BUCKET,
-            Key=key,
-        )
+    json_string = storage.read_text(key)
 
-    except ClientError as e:
+    if json_string is None:
+        return None
 
-        error_code = e.response["Error"]["Code"]
-
-        if error_code in (
-            "NoSuchKey",
-            "404",
-        ):
-            return None
-
-        raise
-
-    payload = json.loads(
-        response["Body"]
-        .read()
-        .decode("utf-8")
-    )
+    payload = json.loads(json_string)
 
     if payload.get("parser_version") != JD_PARSER_VERSION:
         return None
@@ -106,10 +75,8 @@ def save_cached_jd(
     parsed_jd: ParsedJD,
 ) -> str:
     """
-    Save parsed JD into S3 cache.
+    Save parsed JD into the cache.
     """
-
-    s3 = get_s3()
 
     key = get_jd_cache_key(raw_jd)
 
@@ -126,10 +93,4 @@ def save_cached_jd(
         default=str,
     )
 
-    s3.put_object(
-        Bucket=S3_BUCKET,
-        Key=key,
-        Body=json_string.encode("utf-8"),
-    )
-
-    return key
+    return storage.write_text(key, json_string)

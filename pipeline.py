@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from agents.cover_letter_writer import write_cover_letter
-from agents.cv_parser import extract_pdf_text, parse_cv, load_cv_from_s3
+from agents.cv_parser import extract_pdf_text, parse_cv, load_cv
 from agents.evaluator import evaluate_cover_letter
 from agents.jd_parser import parse_jd
 from agents.matcher import compare_cv_to_jd
@@ -21,7 +21,7 @@ save_state,
 )
 
 from control_plane.cover_letter_storage import (
-    save_cover_letter_to_s3,
+    save_cover_letter,
 )
 
 from models.eval_schema import CoverLetterAttempt
@@ -95,8 +95,7 @@ jd_text: str,
 
         # 1. LOAD CV
 
-        state.raw_cv_text = load_cv_from_s3(
-        bucket="cover-letter-agent",
+        state.raw_cv_text = load_cv(
         key=cv_path,
     )
 
@@ -329,7 +328,7 @@ jd_text: str,
 
                 save_state(state)
 
-                cover_letter_key = save_cover_letter_to_s3(
+                cover_letter_key = save_cover_letter(
                     run_id=state.run_id,
                     cover_letter=state.cover_letter,
                 )

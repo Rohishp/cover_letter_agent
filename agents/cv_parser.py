@@ -2,13 +2,12 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from pypdf import PdfReader
 from io import BytesIO
-import boto3
+from control_plane import storage
 from models.cv_schema import ParsedCV
 
 load_dotenv()
 client = OpenAI()
 
-S3_REGION = "eu-central-1"
 
 def extract_pdf_text(
     reader: PdfReader,
@@ -32,29 +31,17 @@ def extract_pdf_text(
     return "\n".join(pages)
 
 
-def load_cv_from_s3(
-    bucket: str,
+def load_cv(
     key: str,
 ) -> str:
     """
-    Load CV PDF from S3 and return extracted text.
+    Load CV PDF through the storage layer and return extracted text.
 
     Example:
-        bucket = "cover-letter-agent"
         key = "resume/Rohish_Resume.pdf"
     """
 
-    s3 = boto3.client(
-        "s3",
-        region_name=S3_REGION,
-    )
-
-    response = s3.get_object(
-        Bucket=bucket,
-        Key=key,
-    )
-
-    pdf_bytes = response["Body"].read()
+    pdf_bytes = storage.read_bytes(key)
 
     reader = PdfReader(
         BytesIO(pdf_bytes)

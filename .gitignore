@@ -3,6 +3,7 @@
 
 # Personal data
 input/
+data/
 
 # Generated runtime artifacts
 output/

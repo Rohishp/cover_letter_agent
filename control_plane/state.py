@@ -10,8 +10,7 @@ from models.jd_schema import ParsedJD
 from models.match_schema import MatchAnalysis
 from models.eval_schema import EvalResult, CoverLetterAttempt
 
-import boto3
-from botocore.exceptions import ClientError
+from control_plane import storage
 
 PipelineStatus = Literal[
     "created",
@@ -30,15 +29,6 @@ PipelineStatus = Literal[
     "rejected",
     "failed",
 ]
-
-S3_BUCKET = "cover-letter-agent"
-S3_REGION = "eu-central-1"
-
-s3 = boto3.client(
-    "s3",
-    region_name=S3_REGION,
-)
-
 
 class CoverLetterState(BaseModel):
     run_id: str = Field(
@@ -195,7 +185,7 @@ class CoverLetterState(BaseModel):
 
 def save_state(state: CoverLetterState) -> str:
     """
-    Save pipeline state to S3.
+    Save pipeline state through the storage layer.
     """
     state.touch()
     key = f"states/{state.run_id}.json"
@@ -207,42 +197,22 @@ def save_state(state: CoverLetterState) -> str:
         default=str,
     )
 
-    s3.put_object(
-        Bucket=S3_BUCKET,
-        Key=key,
-        Body=json_string.encode("utf-8"),
-    )
-
-    return key
+    return storage.write_text(key, json_string)
 
 
 def load_state(run_id: str) -> CoverLetterState:
     """
-    Load pipeline state from S3.
+    Load pipeline state through the storage layer.
     """
 
     key = f"states/{run_id}.json"
 
-    try:
-        response = s3.get_object(
-            Bucket=S3_BUCKET,
-            Key=key,
+    json_string = storage.read_text(key)
+
+    if json_string is None:
+        raise FileNotFoundError(
+            f"No saved state found for run_id: {run_id}"
         )
-
-    except ClientError as e:
-
-        if e.response["Error"]["Code"] == "NoSuchKey":
-            raise FileNotFoundError(
-                f"No saved state found for run_id: {run_id}"
-            )
-
-        raise
-
-    json_string = (
-        response["Body"]
-        .read()
-        .decode("utf-8")
-    )
 
     data = json.loads(json_string)
 
@@ -250,25 +220,18 @@ def load_state(run_id: str) -> CoverLetterState:
 
 
 def list_states() -> list[dict]:
-    response = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix="states/")
-
-    if "Contents" not in response:
-        return []
+    keys = storage.list_keys("states/")
 
     summaries = []
 
-    for obj in sorted(response["Contents"], key=lambda o: o["LastModified"], reverse=True):
+    # run_id embeds a sortable timestamp, so a reverse key sort gives the
+    # same most-recent-first order the old LastModified sort gave.
+    for key in sorted(keys, reverse=True):
         try:
-            run_id = obj["Key"].removeprefix("states/").removesuffix(".json")
+            run_id = key.removeprefix("states/").removesuffix(".json")
             state = load_state(run_id)
             summaries.append(state.summary)
-        except ClientError:
-            continue
-        except ValueError:
-            continue
-        except TypeError:
-            continue
-        except FileNotFoundError:
+        except Exception:
             continue
 
     return summaries

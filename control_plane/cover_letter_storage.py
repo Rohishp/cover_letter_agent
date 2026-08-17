@@ -1,37 +1,17 @@
-import boto3
+from control_plane import storage
 
 
-S3_BUCKET = "cover-letter-agent"
-S3_REGION = "eu-central-1"
-
-
-def get_s3():
-    return boto3.client(
-        "s3",
-        region_name=S3_REGION,
-    )
-
-
-def save_cover_letter_to_s3(
+def save_cover_letter(
     run_id: str,
     cover_letter: str,
 ) -> str:
     """
-    Save generated cover letter to S3.
+    Save generated cover letter through the storage layer.
 
     Returns:
-        S3 key
+        storage key
     """
 
     key = f"cover_letters/{run_id}.txt"
 
-    s3 = get_s3()
-
-    s3.put_object(
-        Bucket=S3_BUCKET,
-        Key=key,
-        Body=cover_letter.encode("utf-8"),
-        ContentType="text/plain",
-    )
-
-    return key
+    return storage.write_text(key, cover_letter)
