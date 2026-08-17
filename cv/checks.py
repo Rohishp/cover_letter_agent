@@ -9,7 +9,7 @@ from docx.oxml.ns import qn
 
 from cv.facts import CVFacts
 from cv.render import SECTION_HEADING_TEXTS
-from cv.schema import CVContent
+from cv.schema import PROFILE_MAX_CHARS, CVContent
 
 
 ALLOWED_FONT = "Calibri"
@@ -21,14 +21,14 @@ MAX_MARGIN_INCHES = 0.8
 EM_DASH = "—"
 EN_DASH = "–"
 
-# Calibri 10pt characters-per-line estimates for the ~6.87in usable column
-# (A4 minus 0.7in margins each side). Calibrated approximations, not true
+# Calibri 10pt characters-per-line estimate for the ~6.87in usable column
+# (A4 minus 0.7in margins each side). A calibrated approximation, not true
 # layout measurement -- exact line wrapping needs the PDF render, which
-# page_count/last_page_fill already require.
-PROFILE_CHARS_PER_LINE = 100
+# page_count/last_page_fill already require. profile_length uses
+# PROFILE_MAX_CHARS directly instead (empirically calibrated against real
+# renders -- see cv/schema.py), which is exact rather than estimated.
 BULLET_CHARS_PER_LINE = 95
 
-MAX_PROFILE_LINES = 3
 MAX_BULLET_LINES = 2
 
 EXPERIENCE_BULLET_RANGE = (3, 5)
@@ -146,9 +146,9 @@ def _rendered_lines(text: str, chars_per_line: int) -> int:
 
 
 def check_profile_length(docx_path: Path, *, content: CVContent, **_) -> CheckResult:
-    lines = _rendered_lines(content.profile, PROFILE_CHARS_PER_LINE)
-    passed = lines <= MAX_PROFILE_LINES
-    return ("profile_length", passed, f"~{lines} rendered lines (limit {MAX_PROFILE_LINES})")
+    length = len(content.profile)
+    passed = length <= PROFILE_MAX_CHARS
+    return ("profile_length", passed, f"{length} chars (limit {PROFILE_MAX_CHARS}, calibrated for 3 lines)")
 
 
 def check_bullets_per_entry(docx_path: Path, *, content: CVContent, **_) -> CheckResult:

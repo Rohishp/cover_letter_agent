@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from cv.facts import CVFacts, ids_by_kind
 from cv.render import FIRST_SECTION, LAST_SECTIONS, validate_section_order
 from cv.schema import (
+    PROFILE_MAX_CHARS,
     Certification,
     CVContent,
     EducationEntry,
@@ -50,12 +51,15 @@ IN_PROGRESS_MARKER = "in progress."
 # selected content). Deliberately sized at the schema max so a fit
 # validated against this placeholder can never be broken by the real
 # (equal-or-shorter) profile that replaces it.
-PROFILE_PLACEHOLDER = (
+_PROFILE_PLACEHOLDER_BASE = (
     "Placeholder profile text reserving maximum layout space during selection "
     "and page-fit. The real, evidence-based profile is written after final "
-    "content is chosen and replaces this text before the CV is delivered to "
-    "reserve worst-case space so the real, shorter profile always fits."
-)[:320]
+    "content is chosen and replaces this text before the CV is delivered. "
+)
+# Repeated, then cut to exactly PROFILE_MAX_CHARS -- the base sentence alone
+# is shorter than the limit, so a plain [:PROFILE_MAX_CHARS] slice would
+# silently under-reserve space instead of covering the true worst case.
+PROFILE_PLACEHOLDER = (_PROFILE_PLACEHOLDER_BASE * 3)[:PROFILE_MAX_CHARS]
 
 
 def _has_digit(text: str) -> bool:

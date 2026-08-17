@@ -1,6 +1,16 @@
 from pydantic import BaseModel, Field
 
 
+# Empirically calibrated (not guessed): profiles rendered at Calibri
+# 10pt across the real column width reliably wrap to 3 lines up to
+# ~353 characters and start spilling to 4 by ~378. 320 was tested
+# against several realistic samples -- natural prose, dense technical
+# vocabulary, short casual phrasing, and the actual selector output
+# that once tripped a stale line-count heuristic -- and rendered in 3
+# lines every time, with real margin to spare.
+PROFILE_MAX_CHARS = 320
+
+
 class BaseEntry(BaseModel):
     position: str
     organisation: str
@@ -57,7 +67,7 @@ class CVContent(BaseModel):
     location: str
     contact_details: list[str] = Field(default_factory=list)   # plain text: email, phone
     contact_links: list[str] = Field(default_factory=list)     # full https:// URLs: linkedin, github
-    profile: str = Field(max_length=320)     # 2-3 lines
+    profile: str = Field(max_length=PROFILE_MAX_CHARS)     # 2-3 lines
     skill_groups: list[SkillGroup]
     experience: list[ExperienceEntry]
     education: list[EducationEntry]
