@@ -1,4 +1,5 @@
 import math
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -7,6 +8,7 @@ from docx import Document
 from docx.oxml.ns import qn
 
 from cv.facts import CVFacts
+from cv.render import SECTION_HEADING_TEXTS
 from cv.schema import CVContent
 
 
@@ -34,6 +36,10 @@ EDUCATION_BULLET_RANGE = (0, 4)
 PROJECT_BULLET_RANGE = (2, 5)
 
 MIN_LAST_PAGE_FILL = 0.25
+
+# Header block is always exactly 4 lines when nothing wraps: name, target
+# title, contact line 1 (location/email/phone), contact line 2 (links).
+EXPECTED_HEADER_LINES = 4
 
 CheckResult = tuple[str, bool | None, str]
 
@@ -207,6 +213,120 @@ def check_tier1_present(docx_path: Path, *, facts: CVFacts, **_) -> CheckResult:
     return ("tier1_present", passed, detail)
 
 
+def extract_ordered_lines(pdf_path: Path) -> list[str]:
+    """
+    Every visual line of text in the rendered PDF, in reading order.
+    """
+
+    import pymupdf as fitz
+
+    pdf = fitz.open(str(pdf_path))
+    lines = []
+
+    for page in pdf:
+        data = page.get_text("dict")
+
+        for block in data["blocks"]:
+            for line in block.get("lines", []):
+                text = "".join(span["text"] for span in line["spans"]).strip()
+
+                if text:
+                    lines.append(text)
+
+    pdf.close()
+    return lines
+
+
+def check_no_orphan_headings(docx_path: Path, *, pdf_path: Path | None, **_) -> CheckResult:
+    if pdf_path is None:
+        return ("no_orphan_headings", None, "skipped: no PDF converter available")
+
+    import pymupdf as fitz
+
+    pdf = fitz.open(str(pdf_path))
+    offending = []
+
+    for page_index, page in enumerate(pdf):
+        data = page.get_text("dict")
+        page_lines = []
+
+        for block in data["blocks"]:
+            for line in block.get("lines", []):
+                text = "".join(span["text"] for span in line["spans"]).strip()
+
+                if text:
+                    page_lines.append(text)
+
+        if page_lines and page_lines[-1] in SECTION_HEADING_TEXTS:
+            offending.append(f"page {page_index + 1}: '{page_lines[-1]}'")
+
+    pdf.close()
+
+    passed = not offending
+    detail = "clean" if passed else "; ".join(offending)
+    return ("no_orphan_headings", passed, detail)
+
+
+def check_contact_lines_no_wrap(docx_path: Path, *, pdf_path: Path | None, **_) -> CheckResult:
+    if pdf_path is None:
+        return ("contact_lines_no_wrap", None, "skipped: no PDF converter available")
+
+    lines = extract_ordered_lines(pdf_path)
+
+    header_lines = []
+    for line in lines:
+        if line in SECTION_HEADING_TEXTS:
+            break
+        header_lines.append(line)
+
+    passed = len(header_lines) == EXPECTED_HEADER_LINES
+    detail = (
+        f"{len(header_lines)} header lines (expected {EXPECTED_HEADER_LINES})"
+        if not passed
+        else "clean"
+    )
+    return ("contact_lines_no_wrap", passed, detail)
+
+
+def _normalize_whitespace(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def check_metric_density(docx_path: Path, *, content: CVContent, pdf_path: Path | None, **_) -> CheckResult:
+    if pdf_path is None:
+        return ("metric_density", None, "skipped: no PDF converter available")
+
+    import pymupdf as fitz
+
+    pdf = fitz.open(str(pdf_path))
+
+    if pdf.page_count == 0:
+        pdf.close()
+        return ("metric_density", None, "no pages")
+
+    page1_text = _normalize_whitespace(pdf[0].get_text())
+    pdf.close()
+
+    all_bullets = []
+    for entry in (*content.experience, *content.education, *content.projects):
+        all_bullets.extend(entry.bullets)
+    all_bullets.extend(content.coursework)
+
+    page1_bullets = [b for b in all_bullets if _normalize_whitespace(b) in page1_text]
+
+    if not page1_bullets:
+        return ("metric_density", True, "0 bullets on page 1")
+
+    digit_bullets = [b for b in page1_bullets if any(ch.isdigit() for ch in b)]
+    fraction = len(digit_bullets) / len(page1_bullets)
+
+    return (
+        "metric_density",
+        True,
+        f"{len(digit_bullets)}/{len(page1_bullets)} page-1 bullets contain a digit ({fraction:.0%})",
+    )
+
+
 def convert_to_pdf(docx_path: Path) -> tuple[Path | None, str]:
     pdf_path = docx_path.with_suffix(".pdf")
 
@@ -309,5 +429,8 @@ def run_checks(
 
     results.append(check_page_count(docx_path, pdf_path=pdf_path))
     results.append(check_last_page_fill(docx_path, pdf_path=pdf_path))
+    results.append(check_no_orphan_headings(docx_path, pdf_path=pdf_path))
+    results.append(check_contact_lines_no_wrap(docx_path, pdf_path=pdf_path))
+    results.append(check_metric_density(docx_path, content=content, pdf_path=pdf_path))
 
     return results

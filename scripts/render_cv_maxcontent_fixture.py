@@ -10,9 +10,9 @@
 import sys
 from pathlib import Path
 
-from cv.checks import convert_to_pdf, run_checks
+from cv.checks import convert_to_pdf, extract_ordered_lines, run_checks
 from cv.facts import CVFacts, load_facts
-from cv.render import render_cv
+from cv.render import DEFAULT_SECTION_ORDER, SECTION_HEADINGS, render_cv
 from cv.schema import (
     Certification,
     CVContent,
@@ -33,16 +33,9 @@ PROFILE_PLACEHOLDER = (
 
 OUT_PATH = Path("output/_layout_test.docx")
 
-SECTION_HEADINGS = [
-    "Profile",
-    "Skills",
-    "Experience",
-    "Education",
-    "Projects",
-    "Certifications",
-    "Languages",
-    "Coursework",
-]
+# A single bullet reading exactly this is a status marker, not real content —
+# render it on the dates line instead of as a bullet.
+IN_PROGRESS_MARKER = "in progress."
 
 
 def _build_experience(facts: CVFacts, notes: list[str]) -> list[ExperienceEntry]:
@@ -76,8 +69,12 @@ def _build_education(facts: CVFacts, notes: list[str]) -> list[EducationEntry]:
 
     for fact in facts.education.entries:
         bullets = fact.bullets
+        dates = fact.dates
 
-        if len(bullets) > 4:
+        if len(bullets) == 1 and bullets[0].strip().lower() == IN_PROGRESS_MARKER:
+            dates = f"{dates}, ongoing"
+            bullets = []
+        elif len(bullets) > 4:
             kept = bullets[:4]
             notes.append(f"{fact.degree}: {len(kept)} of {len(bullets)} bullets used (schema max)")
             bullets = kept
@@ -87,7 +84,7 @@ def _build_education(facts: CVFacts, notes: list[str]) -> list[EducationEntry]:
                 position=fact.degree,
                 organisation=fact.institution,
                 city=fact.city,
-                dates=fact.dates,
+                dates=dates,
                 bullets=bullets,
             )
         )
@@ -130,18 +127,12 @@ def build_maxcontent_cv(facts: CVFacts) -> tuple[CVContent, list[str]]:
 
     notes: list[str] = []
 
-    contact_lines = [
-        facts.personal.email,
-        facts.personal.phone,
-        facts.personal.linkedin,
-        facts.personal.github,
-    ]
-
     content = CVContent(
         full_name=facts.personal.full_name,
         target_title=TARGET_TITLE_PLACEHOLDER,
         location=facts.personal.location,
-        contact_lines=contact_lines,
+        contact_details=[facts.personal.email, facts.personal.phone],
+        contact_links=[facts.personal.linkedin, facts.personal.github],
         profile=PROFILE_PLACEHOLDER,
         skill_groups=[
             SkillGroup(name=group.name, items=group.items)
@@ -169,34 +160,20 @@ def build_maxcontent_cv(facts: CVFacts) -> tuple[CVContent, list[str]]:
     return content, notes
 
 
-def _extract_ordered_lines(pdf_path: Path) -> list[str]:
-    import pymupdf as fitz
-
-    pdf = fitz.open(str(pdf_path))
-    lines = []
-
-    for page in pdf:
-        data = page.get_text("dict")
-
-        for block in data["blocks"]:
-            for line in block.get("lines", []):
-                text = "".join(span["text"] for span in line["spans"]).strip()
-
-                if text:
-                    lines.append(text)
-
-    pdf.close()
-    return lines
-
-
 def section_line_counts(pdf_path: Path) -> dict[str, int]:
-    lines = _extract_ordered_lines(pdf_path)
+    """
+    Rendered body-line count per section (heading line not included).
+    """
+
+    lines = extract_ordered_lines(pdf_path)
+    heading_texts = set(SECTION_HEADINGS.values())
     counts = {name: 0 for name in SECTION_HEADINGS}
+    heading_to_section = {v: k for k, v in SECTION_HEADINGS.items()}
     current = None
 
     for line in lines:
-        if line in SECTION_HEADINGS:
-            current = line
+        if line in heading_texts:
+            current = heading_to_section[line]
             continue
 
         if current is not None:
@@ -210,7 +187,7 @@ def main() -> None:
 
     content, truncation_notes = build_maxcontent_cv(facts)
 
-    out_path = render_cv(content, OUT_PATH)
+    out_path = render_cv(content, OUT_PATH, section_order=DEFAULT_SECTION_ORDER)
     print(f"Rendered: {out_path}")
 
     if truncation_notes:
@@ -234,9 +211,15 @@ def main() -> None:
         print(f"Page count: {page_count} (via {converter_used})")
 
         print()
-        print("Rendered lines per section:")
-        for section, count in section_line_counts(pdf_path).items():
-            print(f"- {section}: {count}")
+        print("Section budget (rendered content lines, and lines saved if the section were dropped entirely):")
+        line_counts = section_line_counts(pdf_path)
+        for section_name in DEFAULT_SECTION_ORDER:
+            count = line_counts[section_name]
+            # Dropping a section removes its heading line too, but only if
+            # the section actually rendered one (render_cv skips empty
+            # sections' headings entirely).
+            saved = count + 1 if count > 0 else 0
+            print(f"- {SECTION_HEADINGS[section_name]}: {count} lines (drop saves {saved})")
 
     print()
     print("Check results:")

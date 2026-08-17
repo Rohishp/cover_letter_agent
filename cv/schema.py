@@ -47,14 +47,16 @@ class CVContent(BaseModel):
     """
     The content of one rendered CV.
 
-    Section order in this model is the render order.
-    Nothing renders that is not in this model.
+    Render order is passed to render_cv() as an explicit section_order,
+    not implied by field order here. Nothing renders that is not in
+    this model.
     """
 
     full_name: str
     target_title: str
     location: str
-    contact_lines: list[str]
+    contact_details: list[str] = Field(default_factory=list)   # plain text: email, phone
+    contact_links: list[str] = Field(default_factory=list)     # full https:// URLs: linkedin, github
     profile: str = Field(max_length=320)     # 2-3 lines
     skill_groups: list[SkillGroup]
     experience: list[ExperienceEntry]
