@@ -18,4 +18,6 @@ Read `CLAUDE.md`, `SPEC.md`, `DECISIONS.md`, then this file. Do only this task.
 Everything not listed above; protected areas in `CLAUDE.md` (scoring weights, thresholds, `cv/` unless named).
 
 ## Result
-(not started)
+Built `verify_application.py` (folder-name pattern incl. real-date check, required files present and non-empty, `run.json` parses with `status == "completed"`, Declined JD via `status == "declined"` checks only `jd.txt` + `run.json`) and `tests/test_verify_folder.py` (21 tests, no LLM). Suite: 219 passed. `facts` is unused until T02.
+
+Surprising: legacy `apply.py` writes `run.json` with no `status` key (only `rejection_reason`/`failure_reason`), so real legacy folders fail the status check until the T07 writer emits `status` (`completed` / `declined`). Owner chose this over inferring status.
