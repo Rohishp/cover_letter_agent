@@ -51,6 +51,8 @@ Done when:
   - Letters are written whole with Write; an Edit that leaves a partial letter can be blocked until it is complete.
   - Once a call targets a guarded file, a hook error also blocks (fail closed); calls to other files are never blocked.
 - `SubagentStop` runs `verify_application` on the folder the sub-agent touched. **[assumed]**
+  - The folders come from a `PostToolUse` record per `agent_id` (Write/Edit `file_path`, or any Bash command naming `output/applications/<folder>`), because the sub-agent transcript does not exist yet when SubagentStop fires. The record is deleted when read.
+  - Exit 2 with the failures keeps the sub-agent working. A second pass never blocks; a verifier error blocks once; a sub-agent that touched no application folder always passes.
 - Hooks only fire on Claude's own tool calls, so they guard sub-agent writes, not files Python writes.
 
 Done when a deliberately bad write is blocked in a real session, and a clean one is not.
