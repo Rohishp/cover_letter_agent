@@ -45,8 +45,6 @@ class CoverLetterState(BaseModel):
         default_factory=lambda: datetime.now().isoformat()
     )
 
-    jd_source: Literal["clipboard", "argument"] | None = None
-
     raw_jd_text: str | None = None
 
     jd_cache_hit: bool = False
@@ -111,78 +109,6 @@ class CoverLetterState(BaseModel):
         self.error = error
         self.touch()
 
-    @property
-    def is_terminal(self) -> bool:
-        return self.status in {
-            "completed",
-            "rejected",
-            "failed",
-        }
-
-    @property
-    def summary(self) -> dict:
-        return {
-            "run_id": self.run_id,
-            "status": self.status,
-            "jd_source": self.jd_source,
-            "jd_cache_hit": self.jd_cache_hit,
-            "job_title": (
-                self.parsed_jd.job_title
-                if self.parsed_jd
-                else None
-            ),
-            "company_name": (
-                self.parsed_jd.company_name
-                if self.parsed_jd
-                else None
-            ),
-            "core_must_have_score": (
-                self.match_analysis.core_must_have_score
-                if self.match_analysis
-                else None
-            ),
-            "eligibility_score": (
-                self.match_analysis.eligibility_score
-                if self.match_analysis
-                else None
-            ),
-            "supporting_score": (
-                self.match_analysis.supporting_score
-                if self.match_analysis
-                else None
-            ),
-            "nice_to_have_score": (
-                self.match_analysis.nice_to_have_score
-                if self.match_analysis
-                else None
-            ),
-            "base_score": (
-                self.match_analysis.base_score
-                if self.match_analysis
-                else None
-            ),
-            "overall_score": (
-                self.match_analysis.overall_score
-                if self.match_analysis
-                else None
-            ),
-            "match_recommendation": (
-                self.match_analysis.recommendation
-                if self.match_analysis
-                else None
-            ),
-            "eval_score": self.eval_score,
-            "cover_letter_key": self.cover_letter_key,
-            "retry_count": self.retry_count,
-            "attempt_count": len(self.cover_letter_attempts),
-            "application_document_requirements": (
-                self.application_document_requirements
-            ),
-            "warnings": self.warnings,
-            "error": self.error,
-        }
-
-
 
 def save_state(state: CoverLetterState) -> str:
     """
@@ -199,40 +125,3 @@ def save_state(state: CoverLetterState) -> str:
     )
 
     return storage.write_text(key, json_string)
-
-
-def load_state(run_id: str) -> CoverLetterState:
-    """
-    Load pipeline state through the storage layer.
-    """
-
-    key = f"states/{run_id}.json"
-
-    json_string = storage.read_text(key)
-
-    if json_string is None:
-        raise FileNotFoundError(
-            f"No saved state found for run_id: {run_id}"
-        )
-
-    data = json.loads(json_string)
-
-    return CoverLetterState(**data)
-
-
-def list_states() -> list[dict]:
-    keys = storage.list_keys("states/")
-
-    summaries = []
-
-    # run_id embeds a sortable timestamp, so a reverse key sort gives the
-    # same most-recent-first order the old LastModified sort gave.
-    for key in sorted(keys, reverse=True):
-        try:
-            run_id = key.removeprefix("states/").removesuffix(".json")
-            state = load_state(run_id)
-            summaries.append(state.summary)
-        except Exception:
-            continue
-
-    return summaries

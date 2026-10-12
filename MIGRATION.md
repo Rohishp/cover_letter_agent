@@ -12,11 +12,7 @@ pipeline's trust were carried over. 198 tests pass here (`OPENAI_API_KEY=test py
 - `.claude/skills/apply`, `CLAUDE.md` invariants, and the tests for all of the above
 
 ## In `_legacy/` for reference only (not imported)
-`pipeline.py`, `apply.py`, `control_plane/reporting.py`, their tests. Rebuild these as a small stage list.
-
-## Still to slim
-- `control_plane/state.py` is kept only because `quality_gates` takes the state. Shrink it; delete dead `load_state` / `list_states`.
-- One shared OpenAI client instead of six.
+`apply.py`, `control_plane/reporting.py`, their tests (`pipeline.py` was rebuilt in T06).
 
 ## Known facts worth keeping
 - gpt-4o at temperature 0 still flips on vague core requirements (core score moves up to 13 points). A 3-run median did not help. Do not rebuild consensus matching; decompose vague requirements or let the user tag them.
@@ -25,4 +21,4 @@ pipeline's trust were carried over. 198 tests pass here (`OPENAI_API_KEY=test py
 ## Next
 1. `verify_application.py` and hooks.
 2. Cover-letter and CV sub-agents; the user writes their skills with `/writing-for-agents`.
-3. New orchestration around the kept modules.
+3. `apply.py` around the rebuilt `pipeline.py` (T07).

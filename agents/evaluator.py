@@ -1,5 +1,4 @@
-from dotenv import load_dotenv
-from openai import OpenAI
+from agents.client import client
 
 from agents.fact_render import render_facts
 from cv.facts import CVFacts
@@ -8,8 +7,6 @@ from models.jd_schema import ParsedJD
 from models.eval_schema import EvalResult
 
 
-load_dotenv()
-client = OpenAI()
 
 
 def evaluate_cover_letter(

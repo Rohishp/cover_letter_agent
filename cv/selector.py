@@ -1,7 +1,6 @@
 import re
 
-from dotenv import load_dotenv
-from openai import OpenAI
+from agents.client import client
 from pydantic import BaseModel
 
 from cv.checks import find_third_person_phrases, profile_opens_with
@@ -15,8 +14,6 @@ from guidelines import (
 from models.jd_schema import ParsedJD
 
 
-load_dotenv()
-client = OpenAI()
 
 MAX_ATTEMPTS = 2
 

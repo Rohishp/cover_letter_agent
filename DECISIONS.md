@@ -25,13 +25,14 @@ Paste a JD into Claude Code CLI, get a tailored cover letter + CV in a folder na
 - **Is it the smaller model?** Possibly part of it; a stronger model may reduce flips (untested). The main driver is vague requirements.
 - **Fabricated employer "Agentic AI"** came from the PDF headline parsed as a title, then repeated at temperature 0.7. Fixed by grounding the writer in the fact base and running at temperature 0. See `docs/cover-letter-path-root-cause.md`.
 
-## Rebuild log (v2, T01-T05)
+## Rebuild log (v2, T01-T06)
 Only what is not obvious from the code. Detail is in each `tasks/T0x-*.md` Result.
 - **T01.** Legacy `apply.py` wrote `run.json` with no `status`, so old folders fail verification. Owner: fix at the source (T07 writer emits `completed` / `declined`), do not infer it.
 - **T02.** A folder holds only the final letter text, so the "at least one factual paragraph" rule is not verified there; it stays in the writer. The allowed target company comes from `run.json` `company_name` (T07 must write it). Checked on a synthetic letter only; no real Application yet.
 - **T03.** No Word/LibreOffice means the page check fails closed (owner choice). `docx2pdf` has no timeout, but `cv/checks.py` is protected. Word via docx2pdf is flaky on this machine; do not run two pytest processes at once.
 - **T04.** The PreToolUse hook is fail-closed once a call targets the letter or `run.json`; its Bash rule is a heuristic (false positives when a command merely mentions the letter name), with `verify_application` as the backstop.
 - **T05.** The sub-agent transcript does not exist yet when `SubagentStop` fires, so touched folders are recorded by a `PostToolUse` hook per `agent_id`. A second pass never blocks (no loops); a verifier error blocks once. In an interactive session background sub-agents hand back before the block lands, so it is only observable in a headless foreground run (`claude -p --include-hook-events`). A new hook event needs a fresh session to load.
+- **T06.** `pipeline.py` is now at the repo root as a stage list. Ported tests fake only the shared OpenAI client's `parse` (dispatching on `response_format`), not pipeline internals; this needed one client in `agents/client.py`, which `cv/selector.py` now imports too (one-line change in a protected folder, behaviour-neutral). `PipelineStatus` values and persist points are unchanged. Dropped from `state.py`: `load_state`, `list_states`, `summary`, `is_terminal`, `jd_source`. `storage.read_bytes` / `list_keys` are now unused but left alone.
 
 ## Removed / retired
 - AWS: `lambda_handler.py`, `invoke_pipeline.py`, S3/boto3 storage.
@@ -44,7 +45,7 @@ Only what is not obvious from the code. Detail is in each `tasks/T0x-*.md` Resul
 2. Matcher noise near thresholds.
 3. `EVAL_PASS_THRESHOLD` uncalibrated against the fact base; a gpt-4o judge grades gpt-4o output.
 4. Post-run verification exists (`verify_application`, T01-T03) with hooks (T04-T05), but has only run on synthetic folders; first real run is T08.
-5. Dead code left in old `state.py`; six separate OpenAI clients.
+5. (resolved in T06) dead `state.py` code and the separate OpenAI clients.
 
 ## Open questions
 See SPEC.md "Open questions".

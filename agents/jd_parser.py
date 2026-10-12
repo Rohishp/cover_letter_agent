@@ -1,11 +1,8 @@
-from dotenv import load_dotenv
-from openai import OpenAI
+from agents.client import client
 
 from models.jd_schema import ParsedJD
 
 
-load_dotenv()
-client = OpenAI()
 
 
 

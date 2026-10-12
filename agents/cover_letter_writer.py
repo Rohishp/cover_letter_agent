@@ -1,5 +1,4 @@
-from dotenv import load_dotenv
-from openai import OpenAI
+from agents.client import client
 
 from control_plane.cover_letter_containment import (
     CLOSING_LINE,
@@ -23,8 +22,6 @@ from models.jd_schema import ParsedJD
 from models.match_schema import MatchAnalysis
 
 
-load_dotenv()
-client = OpenAI()
 
 MAX_ATTEMPTS = 3
 
