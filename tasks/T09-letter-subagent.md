@@ -12,6 +12,7 @@ Owner writes the skill with `/writing-for-agents`. Create the agent definition, 
 - Three real JDs produce verified Applications with no manual edits; the OpenAI writer remains fallback.
 - Full test suite green (`OPENAI_API_KEY=test pytest --ignore=_legacy`).
 - Committed with a message naming this task.
+- `DECISIONS.md` updated: one bullet under "Rebuild log" for anything the code or git history does not show, or "no new decisions" in the Result.
 - A "Result" note appended below (what was built, anything surprising).
 
 ## Out of scope

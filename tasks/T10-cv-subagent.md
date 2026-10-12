@@ -12,6 +12,7 @@ Only after SPEC open question 4 is answered. Sub-agent writes headline and profi
 - Three real JDs verified; `cv/` selection and rendering untouched.
 - Full test suite green (`OPENAI_API_KEY=test pytest --ignore=_legacy`).
 - Committed with a message naming this task.
+- `DECISIONS.md` updated: one bullet under "Rebuild log" for anything the code or git history does not show, or "no new decisions" in the Result.
 - A "Result" note appended below (what was built, anything surprising).
 
 ## Out of scope

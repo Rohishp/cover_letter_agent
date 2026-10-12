@@ -1,6 +1,6 @@
 # Tasks
 
-One task per session, in order. Start the next only when the previous is committed and its Result is filled in.
+One task per session, in order. Start the next only when the previous is committed and its Result is filled in. Every task also updates `DECISIONS.md` (one bullet under "Rebuild log", only for what the code or git history does not show; or write "no new decisions" in the Result).
 
 - [T01-verify-folder](T01-verify-folder.md)
 - [T02-verify-letter](T02-verify-letter.md)

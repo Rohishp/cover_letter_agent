@@ -21,6 +21,7 @@ Extend the role-at-organisation detection to lowercase role words (the existing 
 - Decide and record how to avoid matching ordinary prose ("a team at the front", "engineer at heart"); capitalised-organisation matching must still be required.
 - Full test suite green (`OPENAI_API_KEY=test pytest --ignore=_legacy`).
 - Committed with a message naming this task.
+- `DECISIONS.md` updated: one bullet under "Rebuild log" for anything the code or git history does not show, or "no new decisions" in the Result.
 - A "Result" note appended below.
 
 ## Out of scope

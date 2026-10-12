@@ -12,6 +12,7 @@ Replace `_legacy/pipeline.py` with a small stage list; slim `state.py` (drop dea
 - Legacy pipeline tests ported and green without mocking internals; `_legacy/pipeline.py` deleted.
 - Full test suite green (`OPENAI_API_KEY=test pytest --ignore=_legacy`).
 - Committed with a message naming this task.
+- `DECISIONS.md` updated: one bullet under "Rebuild log" for anything the code or git history does not show, or "no new decisions" in the Result.
 - A "Result" note appended below (what was built, anything surprising).
 
 ## Out of scope
