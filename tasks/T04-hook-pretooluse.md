@@ -18,4 +18,8 @@ Hook script + `.claude/settings.json` entry: on Write/Edit under `output/applica
 Everything not listed above; protected areas in `CLAUDE.md` (scoring weights, thresholds, `cv/` unless named).
 
 ## Result
-(not started)
+Built `scripts/hook_check_letter.py` (pure `decide(payload, facts)` plus a thin stdin/exit-code `main`) and a project `.claude/settings.json` PreToolUse entry on `Write|Edit`. It only acts on `output/applications/**/cover_letter.txt`; for Edit it checks the text after applying the edit, and leaves unknowable cases (old_string missing) to the tool. To share the checks, I split `check_letter_text(letter, facts, company)` out of `verify_application._check_letter`; company comes from the folder's `run.json` if present.
+
+Verified in a real session: a letter with `TODO [insert company]` was blocked (exit 2, failures shown); a valid letter in the same folder was written. 11 unit tests in `tests/test_hook_check_letter.py`; full suite 308 passed, 1 skipped.
+
+Surprising: the settings file was picked up mid-session without a restart. A fresh letter must also pass the structure checks (greeting, closing line, exact name), so a draft written in pieces via Edit may be blocked until complete. Hook runs `python` from PATH (Python 3.10 here).

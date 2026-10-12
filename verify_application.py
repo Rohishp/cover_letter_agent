@@ -134,6 +134,12 @@ def _check_letter(path: Path, facts: CVFacts, company: str | None) -> list[str]:
     except (OSError, ValueError):
         return []
 
+    return check_letter_text(letter, facts, company)
+
+
+def check_letter_text(letter: str, facts: CVFacts, company: str | None) -> list[str]:
+    """Cheap letter checks (checks 3 and 4) on letter text; also used by the PreToolUse hook."""
+
     organisations = known_organisations(facts, company)
     titles = real_held_titles(facts)
     # Only the final text exists, so the "factual paragraph" rule is the writer's, not checked here.
