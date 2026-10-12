@@ -6,6 +6,7 @@ from verify_application import verify_application
 
 
 NAME = "2026-08-17_Acme_Engineer"
+GOOD_LETTER = "Dear team,\n\nI did thing one at Acme Corp.\n\nBest regards,\nTest Person"
 
 
 def make_folder(tmp_path, name=NAME, status="completed", declined=False):
@@ -17,7 +18,7 @@ def make_folder(tmp_path, name=NAME, status="completed", declined=False):
     )
 
     if not declined:
-        (folder / "cover_letter.txt").write_text("Dear team, hello.", encoding="utf-8")
+        (folder / "cover_letter.txt").write_text(GOOD_LETTER, encoding="utf-8")
         (folder / "cv.docx").write_bytes(b"PK fake docx")
 
     return folder
