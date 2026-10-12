@@ -45,7 +45,11 @@ Done when:
 - No check calls an LLM.
 
 ### Phase 2: Hooks
-- `PreToolUse` on Write/Edit under `output/applications/**` blocks content that fails the cheap letter checks (3 and 4). **[assumed]**
+- `PreToolUse` on Write, Edit and Bash blocks writes under `output/applications/**` that would break a guarded file. **[assumed]**
+  - Guarded files: `cover_letter.txt` (content must pass the cheap letter checks: placeholders, structure, hedge disclosure, fabricated employer, fabricated role; for Edit, the text after the edit is checked) and `run.json` (written only by Python, so any Write/Edit is blocked). Other files in the folder are not checked.
+  - Bash is blocked only when the command names `cover_letter.txt` together with a write operator (heuristic; `verify_application` is the backstop).
+  - Letters are written whole with Write; an Edit that leaves a partial letter can be blocked until it is complete.
+  - Once a call targets a guarded file, a hook error also blocks (fail closed); calls to other files are never blocked.
 - `SubagentStop` runs `verify_application` on the folder the sub-agent touched. **[assumed]**
 - Hooks only fire on Claude's own tool calls, so they guard sub-agent writes, not files Python writes.
 
