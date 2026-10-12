@@ -12,3 +12,4 @@ One task per session, in order. Start the next only when the previous is committ
 - [T08-live-run](T08-live-run.md)
 - [T09-letter-subagent](T09-letter-subagent.md)
 - [T10-cv-subagent](T10-cv-subagent.md)
+- [T11-lowercase-role-employer](T11-lowercase-role-employer.md) (independent; found by the T02 test run)
