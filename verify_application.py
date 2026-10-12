@@ -123,22 +123,9 @@ def _clip(text: str) -> str:
     return text if len(text) <= MAX_FRAGMENT else text[:MAX_FRAGMENT] + "..."
 
 
-def _check_letter(path: Path, facts: CVFacts, company: str | None) -> list[str]:
-    """Letter checks on the final text. Missing/unreadable files are reported by _check_files."""
-
-    if not _regular(path):
-        return []
-
-    try:
-        letter = path.read_text(encoding="utf-8")
-    except (OSError, ValueError):
-        return []
-
-    return check_letter_text(letter, facts, company)
-
-
 def check_letter_text(letter: str, facts: CVFacts, company: str | None) -> list[str]:
-    """Cheap letter checks (checks 3 and 4) on letter text; also used by the PreToolUse hook."""
+    """Cheap letter checks (placeholders, structure, hedges, fabricated employer/role) on letter text.
+    Shared by _check_letter and the PreToolUse hook."""
 
     organisations = known_organisations(facts, company)
     titles = real_held_titles(facts)
@@ -153,6 +140,20 @@ def check_letter_text(letter: str, facts: CVFacts, company: str | None) -> list[
     ]
 
     return [f"cover_letter.txt: {v}" for v in violations]
+
+
+def _check_letter(path: Path, facts: CVFacts, company: str | None) -> list[str]:
+    """Letter checks on the final text. Missing/unreadable files are reported by _check_files."""
+
+    if not _regular(path):
+        return []
+
+    try:
+        letter = path.read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        return []
+
+    return check_letter_text(letter, facts, company)
 
 
 def _docx_text(path: Path) -> str:
