@@ -3,13 +3,14 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from agents.cover_letter_writer import _real_employers, _real_held_titles, _real_institutions
 from control_plane.application_paths import MAX_COMPONENT_LENGTH
 from control_plane.cover_letter_containment import (
     check_fabricated_employer,
     check_fabricated_role_claim,
     check_hedge_disclosure,
     check_letter_structure,
+    known_organisations,
+    real_held_titles,
 )
 from cv.facts import CVFacts
 from models.cover_letter_schema import CoverLetterDraft, CoverLetterParagraph
@@ -22,7 +23,8 @@ FOLDER_RE = re.compile(rf"^(\d{{4}}-\d{{2}}-\d{{2}})_({_WORD})_({_WORD})(_\d+)?$
 APPLICATION_FILES = ("cover_letter.txt", "cv.docx", "jd.txt", "run.json")
 DECLINED_FILES = ("jd.txt", "run.json")
 
-PLACEHOLDER_RE = re.compile(r"\[[^\]\n]*\]|\{\{|\bTODO\b|<[A-Za-z][^>\n]*>")
+PLACEHOLDER_RE = re.compile(r"\[[^\]\n]*\]|\{\{|\bTODO\b|<[A-Za-z _-]+>")
+MAX_FRAGMENT = 60  # failure strings carry letter text; keep it short
 
 
 def _valid_date(text: str) -> bool:
@@ -59,7 +61,7 @@ def _read_run_json(folder: Path) -> tuple[dict, list[str]]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        return {}, [f"run.json is not valid JSON: {exc}"]
+        return {}, [f"run.json is not valid JSON: {_clip(str(exc))}"]
 
     if not isinstance(data, dict):
         return {}, ["run.json is not a JSON object"]
@@ -67,7 +69,7 @@ def _read_run_json(folder: Path) -> tuple[dict, list[str]]:
     status = data.get("status")
 
     if status not in ("completed", "declined"):
-        return data, [f"run.json status is {status!r}, expected 'completed'"]
+        return data, [f"run.json status is {_clip(repr(status))}, expected 'completed'"]
 
     return data, []
 
@@ -97,6 +99,10 @@ def _check_files(folder: Path, names: tuple[str, ...]) -> list[str]:
     return failures
 
 
+def _clip(text: str) -> str:
+    return text if len(text) <= MAX_FRAGMENT else text[:MAX_FRAGMENT] + "..."
+
+
 def _check_letter(path: Path, facts: CVFacts, company: str | None) -> list[str]:
     """Letter checks on the final text. Missing/unreadable files are reported by _check_files."""
 
@@ -105,15 +111,16 @@ def _check_letter(path: Path, facts: CVFacts, company: str | None) -> list[str]:
     except (OSError, ValueError):
         return []
 
-    organisations = [*_real_employers(facts), *_real_institutions(facts), *([company] if company else [])]
+    organisations = known_organisations(facts, company)
+    titles = real_held_titles(facts)
     # Only the final text exists, so the "factual paragraph" rule is the writer's, not checked here.
     draft = CoverLetterDraft(paragraphs=[CoverLetterParagraph(kind="factual", text=letter)])
     violations = [
-        *(f"placeholder {m!r}" for m in PLACEHOLDER_RE.findall(letter)),
-        *check_letter_structure(letter, draft, facts),
-        *(f"hedge phrase {v!r}" for v in check_hedge_disclosure(letter)),
-        *(f"fabricated employer {v!r}" for v in check_fabricated_employer(letter, organisations)),
-        *(f"fabricated role claim {v!r}" for v in check_fabricated_role_claim(letter, _real_held_titles(facts))),
+        *(f"placeholder {_clip(m)}" for m in PLACEHOLDER_RE.findall(letter)),
+        *(_clip(v) for v in check_letter_structure(letter, draft, facts)),
+        *(f"hedge phrase {_clip(v)}" for v in check_hedge_disclosure(letter)),
+        *(f"fabricated employer {_clip(v)}" for v in check_fabricated_employer(letter, organisations)),
+        *(f"fabricated role claim {_clip(v)}" for v in check_fabricated_role_claim(letter, titles)),
     ]
 
     return [f"cover_letter.txt: {v}" for v in violations]
@@ -126,10 +133,11 @@ def verify_application(folder: Path, facts: CVFacts) -> list[str]:
     data, run_failures = _read_run_json(folder)
     declined = data.get("status") == "declined"
     company = data.get("company_name")
+    company = company if isinstance(company, str) else None
     failures = _check_name(folder) + run_failures
     failures += _check_files(folder, DECLINED_FILES if declined else APPLICATION_FILES)
 
     if not declined:
-        failures += _check_letter(folder / "cover_letter.txt", facts, company if isinstance(company, str) else None)
+        failures += _check_letter(folder / "cover_letter.txt", facts, company)
 
     return failures

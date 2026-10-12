@@ -23,5 +23,6 @@ Added letter checks to `verify_application` (skipped for Declined JDs): placehol
 Surprising / owner choices:
 - `check_letter_structure` needs a `CoverLetterDraft`, but a folder holds only the final text. Owner chose a split check: greeting, closing line and exact-name final line are checked here; the "at least one factual paragraph" rule is NOT checked (a one-paragraph factual draft is passed to satisfy the signature) and stays enforced in the writer.
 - Target company allowed in "at <Company>" claims is read from `run.json` `company_name`; the T07 writer must emit it. Without it, such a line is flagged.
-- Employer/title helpers are imported from `agents/cover_letter_writer.py` (private `_real_*` names).
+- Employer/title helpers now live in `control_plane/cover_letter_containment.py` (`real_employers`, `real_institutions`, `real_held_titles`, `known_organisations`); the writer imports them, so the verifier no longer loads the OpenAI client.
+- Review fix: `_ORG_LED_CLAUSE_PATTERN` now uses `re.MULTILINE`; before, an "At <Org>, I ..." clause opening a later paragraph was missed.
 - "A good real letter returns []" is covered by a synthetic letter only; not yet run on a real Application folder.

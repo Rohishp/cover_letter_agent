@@ -5,6 +5,33 @@ from cv.facts import CVFacts
 from models.cover_letter_schema import CoverLetterDraft
 
 
+def real_employers(facts: CVFacts) -> list[str]:
+    return [fact.organisation for fact in facts.work_experience.entries]
+
+
+def real_institutions(facts: CVFacts) -> list[str]:
+    return [fact.institution for fact in facts.education.entries]
+
+
+def real_held_titles(facts: CVFacts) -> list[str]:
+    return [fact.position for fact in facts.work_experience.entries]
+
+
+def known_organisations(facts: CVFacts, target_company: str | None = None) -> list[str]:
+    """
+    Real employers/institutions a letter may name, plus the target company
+    itself (an aspirational mention like "at n8n, I would..." is not an
+    employer-history claim).
+    """
+
+    organisations = [*real_employers(facts), *real_institutions(facts)]
+
+    if target_company:
+        organisations.append(target_company)
+
+    return organisations
+
+
 # Item 4: a targeted, hard-fail check for one specific, high-precision
 # fabrication shape -- "<role> at/with/for <Organisation>". Narrow on
 # purpose: a specific grammatical pattern plus a small closed list keeps
@@ -27,7 +54,8 @@ _POSITION_AT_ORGANISATION_PATTERN = re.compile(
 # start of the letter) so it doesn't fire mid-sentence on unrelated uses
 # of "at"/"with"/"for".
 _ORG_LED_CLAUSE_PATTERN = re.compile(
-    r"(?:^|[.!?]\s+)(?:At|With|For)\s+((?:[A-Z][A-Za-z0-9&.'-]*\s*){1,4}),\s+I\b"
+    r"(?:^|[.!?]\s+)(?:At|With|For)\s+((?:[A-Z][A-Za-z0-9&.'-]*\s*){1,4}),\s+I\b",
+    re.MULTILINE,
 )
 
 

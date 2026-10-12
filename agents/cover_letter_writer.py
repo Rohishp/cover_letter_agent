@@ -7,6 +7,8 @@ from control_plane.cover_letter_containment import (
     check_fabricated_role_claim,
     check_hedge_disclosure,
     check_letter_structure,
+    known_organisations as get_known_organisations,
+    real_held_titles as get_real_held_titles,
 )
 from cv.containment import check_citation_specificity
 from cv.facts import CVFacts
@@ -25,33 +27,6 @@ load_dotenv()
 client = OpenAI()
 
 MAX_ATTEMPTS = 3
-
-
-def _real_employers(facts: CVFacts) -> list[str]:
-    return [fact.organisation for fact in facts.work_experience.entries]
-
-
-def _real_institutions(facts: CVFacts) -> list[str]:
-    return [fact.institution for fact in facts.education.entries]
-
-
-def _real_held_titles(facts: CVFacts) -> list[str]:
-    return [fact.position for fact in facts.work_experience.entries]
-
-
-def _known_organisations(facts: CVFacts, parsed_jd: ParsedJD) -> list[str]:
-    """
-    Real employers/institutions the writer may name, plus the target
-    company itself (an aspirational mention like "at n8n, I would..." is
-    not an employer-history claim).
-    """
-
-    organisations = [*_real_employers(facts), *_real_institutions(facts)]
-
-    if parsed_jd.company_name:
-        organisations.append(parsed_jd.company_name)
-
-    return organisations
 
 
 def validate_cover_letter_draft(
@@ -355,8 +330,8 @@ def write_cover_letter(
     """
 
     facts_block = _render_facts_with_ids(facts)
-    known_organisations = _known_organisations(facts, parsed_jd)
-    real_held_titles = _real_held_titles(facts)
+    known_organisations = get_known_organisations(facts, parsed_jd.company_name)
+    real_held_titles = get_real_held_titles(facts)
     valid_ids = facts.all_ids()
 
     grounding_feedback = None

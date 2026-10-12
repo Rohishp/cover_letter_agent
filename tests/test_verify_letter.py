@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from tests.test_verify_folder import GOOD_LETTER, make_folder
+from helpers import GOOD_LETTER, make_folder
 from verify_application import verify_application
 
 
@@ -51,10 +51,35 @@ def test_fabricated_employer_fails(tmp_path, facts):
     assert any("fabricated employer" in f for f in letter_failures(tmp_path, facts, letter))
 
 
-def test_target_company_from_run_json_is_allowed(tmp_path, facts):
-    letter = GOOD_LETTER.replace("I did thing one at Acme Corp.", "At Newco, I would help.")
+ORG_LED_LETTER = GOOD_LETTER.replace("I did thing one at Acme Corp.", "I did thing one at Acme Corp.\n\nAt Newco, I would help.")
 
-    assert letter_failures(tmp_path, facts, letter, company_name="Newco") == []
+
+def test_target_company_from_run_json_is_allowed(tmp_path, facts):
+    assert letter_failures(tmp_path, facts, ORG_LED_LETTER, company_name="Newco") == []
+
+
+@pytest.mark.parametrize("run", [{}, {"company_name": None}, {"company_name": 5}])
+def test_org_led_clause_without_company_is_flagged(tmp_path, facts, run):
+    assert any("fabricated employer" in f for f in letter_failures(tmp_path, facts, ORG_LED_LETTER, **run))
+
+
+def test_org_led_clause_opening_a_paragraph_is_caught(tmp_path, facts):
+    letter = GOOD_LETTER.replace("I did thing one at Acme Corp.", "At Fakecorp, I did it.")
+
+    assert any("fabricated employer" in f for f in letter_failures(tmp_path, facts, letter))
+
+
+def test_unreadable_letter_is_reported_once(tmp_path, facts):
+    folder = make_folder(tmp_path)
+    (folder / "cover_letter.txt").write_bytes(b"\xff\xfe\x00bad")
+
+    assert verify_application(folder, facts) == ["cover_letter.txt is unreadable"]
+
+
+def test_long_fragments_are_clipped(tmp_path, facts):
+    letter = GOOD_LETTER.replace("thing one", "[" + "x" * 300 + "]")
+
+    assert all(len(f) < 150 for f in letter_failures(tmp_path, facts, letter))
 
 
 def test_fabricated_role_claim_fails(tmp_path, facts):
@@ -64,4 +89,13 @@ def test_fabricated_role_claim_fails(tmp_path, facts):
 
 
 def test_declined_jd_skips_letter_checks(tmp_path, facts):
-    assert verify_application(make_folder(tmp_path, declined=True), facts) == []
+    folder = make_folder(tmp_path, declined=True)
+    (folder / "cover_letter.txt").write_text("[Company] TODO", encoding="utf-8")
+
+    assert verify_application(folder, facts) == []
+
+
+def test_email_in_angle_brackets_is_not_a_placeholder(tmp_path, facts):
+    letter = GOOD_LETTER.replace("thing one", "thing one (reach me at <me@example.com>)")
+
+    assert letter_failures(tmp_path, facts, letter) == []
