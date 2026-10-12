@@ -2,8 +2,7 @@ import json
 
 import pytest
 
-from helpers import GOOD_LETTER, make_folder
-from verify_application import verify_application
+from helpers import GOOD_LETTER, make_folder, verify_application
 
 
 def letter_failures(tmp_path, facts, letter, **run):

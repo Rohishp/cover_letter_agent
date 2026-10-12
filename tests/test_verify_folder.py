@@ -2,8 +2,7 @@ import json
 
 import pytest
 
-from helpers import NAME, make_folder
-from verify_application import verify_application
+from helpers import NAME, make_folder, verify_application
 
 
 def test_good_application_has_no_failures(tmp_path, facts):
