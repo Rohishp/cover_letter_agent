@@ -102,3 +102,27 @@ def test_declined_jd_still_requires_jd(tmp_path, facts):
     (folder / "jd.txt").unlink()
 
     assert "jd.txt is missing" in verify_application(folder, facts)
+
+
+def test_non_utf8_text_file_is_reported_not_raised(tmp_path, facts):
+    folder = make_folder(tmp_path)
+    (folder / "jd.txt").write_bytes(b"\xff\xfe\x00bad")
+
+    assert "jd.txt is unreadable" in verify_application(folder, facts)
+
+
+@pytest.mark.parametrize("content", ["[]", '{"status": 1}'])
+def test_run_json_wrong_shape_fails(tmp_path, facts, content):
+    folder = make_folder(tmp_path)
+    (folder / "run.json").write_text(content, encoding="utf-8")
+
+    failures = verify_application(folder, facts)
+
+    assert any("not a JSON object" in f or "expected 'completed'" in f for f in failures)
+
+
+def test_overlong_or_malformed_component_fails(tmp_path, facts):
+    for name in ("2026-08-17_" + "A" * 41 + "_Engineer", "2026-08-17_-Acme_Engineer", "2026-08-17_Ac--me_Engineer"):
+        failures = verify_application(make_folder(tmp_path, name=name), facts)
+
+        assert any("folder name" in f for f in failures), name
