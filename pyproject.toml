@@ -1,4 +1,2 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
-# Word automation (docx2pdf) emits harmless RPC errors on COM cleanup; faulthandler prints each as a stack dump.
-addopts = "-p no:faulthandler"

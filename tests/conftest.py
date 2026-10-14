@@ -1,3 +1,4 @@
+import faulthandler
 from datetime import date
 
 import pytest
@@ -21,6 +22,35 @@ from cv.facts import (
     WorkExperience,
     WorkExperienceFact,
 )
+
+
+@pytest.fixture(autouse=True)
+def quiet_word_com_cleanup(monkeypatch):
+    """
+    docx2pdf releases its Word COM handles right after word.Quit(), which Windows
+    reports as RPC errors (0x800706ba / 0x800706be); pytest's faulthandler prints each
+    as a stack dump although the conversion succeeded. Pause faulthandler for the
+    duration of the Word call only, so real crashes elsewhere still dump.
+    """
+
+    try:
+        import docx2pdf
+    except ImportError:
+        return
+
+    real_convert = docx2pdf.convert
+
+    def convert(*args, **kwargs):
+        was_enabled = faulthandler.is_enabled()
+        faulthandler.disable()
+
+        try:
+            return real_convert(*args, **kwargs)
+        finally:
+            if was_enabled:
+                faulthandler.enable()
+
+    monkeypatch.setattr(docx2pdf, "convert", convert)
 
 
 @pytest.fixture

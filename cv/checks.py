@@ -432,35 +432,56 @@ def check_metric_density(docx_path: Path, *, content: CVContent, pdf_path: Path 
 
 WORD_ATTEMPTS = 2
 WORD_RETRY_PAUSE_SECONDS = 2
+ERROR_DETAIL_MAX_CHARS = 200
+
+
+def _one_line(error: Exception) -> str:
+    text = " ".join(f"{type(error).__name__}: {error}".split())
+    return text[:ERROR_DETAIL_MAX_CHARS]
+
+
+def _pdf_written(pdf_path: Path) -> bool:
+    return pdf_path.exists() and pdf_path.stat().st_size > 0
 
 
 def convert_to_pdf(docx_path: Path) -> tuple[Path | None, str]:
     pdf_path = docx_path.with_suffix(".pdf")
-    word_error = None
+    problems = []
 
-    # Word automation drops its COM connection now and then (RPC "server
-    # unavailable" / "call failed"), e.g. when another Word or pytest process
-    # is running. One fresh attempt is enough; keep the real error so the
-    # failure message says why.
-    for attempt in range(WORD_ATTEMPTS):
-        try:
-            from docx2pdf import convert
+    # Word automation can drop its COM connection (RPC "server unavailable" /
+    # "call failed"), e.g. while another Word is running, and can also raise
+    # after it has already written the PDF (COM cleanup). So the file decides,
+    # not the exception; a second attempt is made if there is none. Any
+    # earlier PDF is removed first so a stale one is never mistaken for output.
+    try:
+        from docx2pdf import convert
+    except ImportError:
+        problems.append("docx2pdf is not installed")
+    else:
+        for attempt in range(WORD_ATTEMPTS):
+            pdf_path.unlink(missing_ok=True)
+            word_error = "Word wrote no PDF"
 
-            convert(str(docx_path), str(pdf_path))
+            try:
+                convert(str(docx_path), str(pdf_path))
+            except Exception as error:
+                word_error = _one_line(error)
 
-            if pdf_path.exists():
+            if _pdf_written(pdf_path):
                 return pdf_path, "docx2pdf (MS Word)"
 
-            word_error = "Word produced no PDF"
-        except Exception as error:
-            word_error = f"{type(error).__name__}: {error}"
+            if attempt + 1 < WORD_ATTEMPTS:
+                time.sleep(WORD_RETRY_PAUSE_SECONDS)
 
-        if attempt + 1 < WORD_ATTEMPTS:
-            time.sleep(WORD_RETRY_PAUSE_SECONDS)
+        problems.append(f"Word failed ({word_error})")
 
     soffice = shutil.which("soffice")
 
-    if soffice:
+    if not soffice:
+        problems.append("soffice is not installed")
+    else:
+        pdf_path.unlink(missing_ok=True)
+
         try:
             subprocess.run(
                 [
@@ -477,14 +498,14 @@ def convert_to_pdf(docx_path: Path) -> tuple[Path | None, str]:
                 timeout=120,
             )
 
-            if pdf_path.exists():
+            if _pdf_written(pdf_path):
                 return pdf_path, "soffice"
-        except Exception:
-            pass
 
-    detail = "neither docx2pdf (MS Word) nor soffice available"
+            problems.append("soffice wrote no PDF")
+        except Exception as error:
+            problems.append(f"soffice failed ({_one_line(error)})")
 
-    return None, f"{detail} (Word error: {word_error})" if word_error else detail
+    return None, "; ".join(problems)
 
 
 def check_page_count(docx_path: Path, *, pdf_path: Path | None, **_) -> CheckResult:
