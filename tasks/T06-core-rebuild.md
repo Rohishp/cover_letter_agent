@@ -20,7 +20,7 @@ Everything not listed above; protected areas in `CLAUDE.md` (scoring weights, th
 
 ## Result
 Done.
-- `pipeline.py` (repo root) is a stage list: `parse_jd_stage, validate_jd, match, gate, write_and_evaluate`; each returns True to end the run, and `run_pipeline` keeps the same signature and catch-all error handling. Status values and `save_state` points match legacy. `_legacy/pipeline.py` deleted.
+- `pipeline.py` (repo root) is a stage list: `parse_jd_stage, validate_jd, match_stage, gate, write_and_evaluate`; each returns True to end the run, and `run_pipeline` keeps the same signature and catch-all error handling. Status values and `save_state` points match legacy. `_legacy/pipeline.py` deleted.
 - `control_plane/state.py` slimmed (see DECISIONS T06). `agents/client.py` holds the one OpenAI client; the four agents and `cv/selector.py` import it.
 - Legacy pipeline tests ported to `tests/test_pipeline.py` (8 tests), faking only `client.beta.chat.completions.parse`; the force-parity test now compares the writer's real request instead of mock kwargs. Added persistence and short-JD tests.
 - Surprising: my first draft cited a non-existent fact ID (`exp.acme-corp`; real is `exp.acme`), and the real writer validation correctly failed the run, which is the benefit of not mocking the writer.
