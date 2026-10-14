@@ -145,13 +145,70 @@ def test_forced_writer_call_is_indistinguishable_from_a_normal_one(monkeypatch, 
     assert "Evaluator feedback" not in forced_call["messages"][1]["content"]
 
 
-def test_state_is_persisted_on_every_transition(monkeypatch, facts, tmp_path):
+@pytest.fixture
+def saved_statuses(monkeypatch):
+    """Records the status at every real save_state call (the save still happens)."""
+
+    seen = []
+    real = pipeline.save_state
+    monkeypatch.setattr(pipeline, "save_state", lambda state: (seen.append(state.status), real(state))[1])
+    return seen
+
+
+def _in_order(seen, expected):
+    positions = [seen.index(status) for status in expected]
+    return positions == sorted(positions)
+
+
+def test_state_is_persisted_on_every_transition(monkeypatch, facts, tmp_path, saved_statuses):
     fake = FakeOpenAI(PARSED_JD, _match("strong"), [GOOD])
     state = _run(monkeypatch, fake, facts)
 
+    assert _in_order(saved_statuses, [
+        "created", "jd_loaded", "jd_parsed", "jd_validated", "matching", "match_complete",
+        "writing_cover_letter", "cover_letter_ready", "evaluating_cover_letter",
+        "evaluation_complete", "completed",
+    ])
     saved = json.loads((tmp_path / "data" / "states" / f"{state.run_id}.json").read_text(encoding="utf-8"))
     assert saved["status"] == "completed"
     assert (tmp_path / "data" / saved["cover_letter_key"]).read_text(encoding="utf-8") == state.cover_letter
+
+
+def test_rejected_and_failed_runs_persist_their_terminal_state(monkeypatch, facts, saved_statuses):
+    _run(monkeypatch, FakeOpenAI(PARSED_JD, _match("not_evidenced"), [GOOD]), facts)
+    assert saved_statuses[-1] == "rejected"
+
+    saved_statuses.clear()
+    _run(monkeypatch, FakeOpenAI(PARSED_JD, _match("strong"), [GOOD]), facts, jd_text="Too short.")
+    assert saved_statuses[-1] == "failed"
+
+
+def test_failing_evaluation_retries_with_feedback_then_fails(monkeypatch, facts):
+    weak = CriterionScore(score=5, feedback="weak")
+    low = PASSING_EVAL.model_copy(update={
+        "keyword_match": weak, "proof_over_pitch": weak, "zero_resume_duplication": weak,
+        "cta": weak, "overall_score": 35, "feedback_text": "Make the hook sharper.",
+    })
+    fake = FakeOpenAI(PARSED_JD, _match("strong"), [GOOD], eval_result=low)
+    state = _run(monkeypatch, fake, facts)
+    requests = [c["messages"][1]["content"] for c in fake.of(CoverLetterDraft)]
+
+    assert state.status == "failed"
+    assert "after 2 retries. Final score: 35" in state.error
+    assert len(requests) == pipeline.MAX_COVER_LETTER_RETRIES + 1
+    assert "Make the hook sharper." not in requests[0]
+    assert "Make the hook sharper." in requests[1]
+
+
+def test_api_key_in_an_error_is_redacted(monkeypatch, facts):
+    def boom(**kwargs):
+        raise RuntimeError("Incorrect API key provided: sk-proj-abc123XYZ.")
+
+    state = _run(monkeypatch, boom, facts)
+
+    assert state.status == "failed"
+    assert "sk-proj-abc123XYZ" not in state.error
+    assert "sk-***" in state.error
 
 
 def test_too_short_jd_fails_before_any_matching(monkeypatch, facts):

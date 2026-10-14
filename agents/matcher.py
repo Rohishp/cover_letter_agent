@@ -1,13 +1,11 @@
 import json
 
-from agents.client import client
 
+from agents.client import client
 from agents.fact_render import render_facts
 from cv.facts import CVFacts
 from models.jd_schema import ParsedJD
 from models.match_schema import MatchAnalysis
-
-
 
 
 def build_requirement_payload(parsed_jd: ParsedJD) -> dict:

@@ -1,12 +1,10 @@
-from agents.client import client
 
+from agents.client import client
 from agents.fact_render import render_facts
 from cv.facts import CVFacts
 from guidelines import GENERIC_HOOK_RULE
 from models.jd_schema import ParsedJD
 from models.eval_schema import EvalResult
-
-
 
 
 def evaluate_cover_letter(

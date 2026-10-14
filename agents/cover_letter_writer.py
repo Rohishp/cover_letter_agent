@@ -1,5 +1,5 @@
-from agents.client import client
 
+from agents.client import client
 from control_plane.cover_letter_containment import (
     CLOSING_LINE,
     check_fabricated_employer,
@@ -20,7 +20,6 @@ from guidelines import (
 from models.cover_letter_schema import CoverLetterDraft
 from models.jd_schema import ParsedJD
 from models.match_schema import MatchAnalysis
-
 
 
 MAX_ATTEMPTS = 3

@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 
 from agents.cover_letter_writer import write_cover_letter
@@ -22,6 +23,9 @@ from cv.facts import CVFacts
 from cv.selection_rules import requirement_evidence_fact_ids
 from models.eval_schema import CoverLetterAttempt
 from models.match_schema import MatchAnalysis
+
+
+_API_KEY = re.compile(r"sk-[A-Za-z0-9_-]+")
 
 
 @dataclass
@@ -53,7 +57,7 @@ def should_generate_cover_letter(match: MatchAnalysis) -> bool:
 
 # Stages: each takes (state, inputs) and returns True to end the run early.
 
-def parse_jd_stage(state: CoverLetterState, inputs: Inputs) -> bool:
+def parse_jd_stage(state: CoverLetterState, _inputs: Inputs) -> bool:
     state.jd_cache_key = create_jd_cache_key(state.raw_jd_text)
     state.parsed_jd, state.jd_cache_hit = parse_jd_cached(state.raw_jd_text)
     state.application_document_requirements = (
@@ -63,7 +67,7 @@ def parse_jd_stage(state: CoverLetterState, inputs: Inputs) -> bool:
     return False
 
 
-def validate_jd(state: CoverLetterState, inputs: Inputs) -> bool:
+def validate_jd(state: CoverLetterState, _inputs: Inputs) -> bool:
     if not validate_jd_input_quality(state):
         save_state(state)
         return True
@@ -72,7 +76,7 @@ def validate_jd(state: CoverLetterState, inputs: Inputs) -> bool:
     return False
 
 
-def match(state: CoverLetterState, inputs: Inputs) -> bool:
+def match_stage(state: CoverLetterState, inputs: Inputs) -> bool:
     _advance(state, "matching")
     analysis = compare_cv_to_jd(parsed_jd=state.parsed_jd, facts=inputs.facts)
     validate_match_coverage(parsed_jd=state.parsed_jd, match=analysis)
@@ -183,7 +187,7 @@ def write_and_evaluate(state: CoverLetterState, inputs: Inputs) -> bool:
         save_state(state)
 
 
-STAGES = [parse_jd_stage, validate_jd, match, gate, write_and_evaluate]
+STAGES = [parse_jd_stage, validate_jd, match_stage, gate, write_and_evaluate]
 
 
 def run_pipeline(
@@ -213,7 +217,8 @@ def run_pipeline(
             if stage(state, inputs):
                 break
     except Exception as error:
-        state.set_error(str(error))
+        # SDK errors can echo a (masked) API key; never persist or show it.
+        state.set_error(_API_KEY.sub("sk-***", str(error)))
         save_state(state)
 
     return state

@@ -1,9 +1,6 @@
+
 from agents.client import client
-
 from models.jd_schema import ParsedJD
-
-
-
 
 
 def parse_jd(raw_jd: str) -> ParsedJD:

@@ -1,8 +1,8 @@
 import re
 
-from agents.client import client
 from pydantic import BaseModel
 
+from agents.client import client
 from cv.checks import find_third_person_phrases, profile_opens_with
 from cv.containment import check_citation_specificity, check_containment, check_jd_vocabulary_grounding
 from cv.facts import CVFacts, ids_by_kind
@@ -12,7 +12,6 @@ from guidelines import (
     TRADE_OFF_OWNERSHIP_GUIDANCE,
 )
 from models.jd_schema import ParsedJD
-
 
 
 MAX_ATTEMPTS = 2
