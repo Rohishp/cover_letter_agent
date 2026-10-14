@@ -2,6 +2,7 @@ import math
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from docx import Document
@@ -429,18 +430,33 @@ def check_metric_density(docx_path: Path, *, content: CVContent, pdf_path: Path 
     )
 
 
+WORD_ATTEMPTS = 2
+WORD_RETRY_PAUSE_SECONDS = 2
+
+
 def convert_to_pdf(docx_path: Path) -> tuple[Path | None, str]:
     pdf_path = docx_path.with_suffix(".pdf")
+    word_error = None
 
-    try:
-        from docx2pdf import convert
+    # Word automation drops its COM connection now and then (RPC "server
+    # unavailable" / "call failed"), e.g. when another Word or pytest process
+    # is running. One fresh attempt is enough; keep the real error so the
+    # failure message says why.
+    for attempt in range(WORD_ATTEMPTS):
+        try:
+            from docx2pdf import convert
 
-        convert(str(docx_path), str(pdf_path))
+            convert(str(docx_path), str(pdf_path))
 
-        if pdf_path.exists():
-            return pdf_path, "docx2pdf (MS Word)"
-    except Exception:
-        pass
+            if pdf_path.exists():
+                return pdf_path, "docx2pdf (MS Word)"
+
+            word_error = "Word produced no PDF"
+        except Exception as error:
+            word_error = f"{type(error).__name__}: {error}"
+
+        if attempt + 1 < WORD_ATTEMPTS:
+            time.sleep(WORD_RETRY_PAUSE_SECONDS)
 
     soffice = shutil.which("soffice")
 
@@ -466,7 +482,9 @@ def convert_to_pdf(docx_path: Path) -> tuple[Path | None, str]:
         except Exception:
             pass
 
-    return None, "neither docx2pdf (MS Word) nor soffice available"
+    detail = "neither docx2pdf (MS Word) nor soffice available"
+
+    return None, f"{detail} (Word error: {word_error})" if word_error else detail
 
 
 def check_page_count(docx_path: Path, *, pdf_path: Path | None, **_) -> CheckResult:
