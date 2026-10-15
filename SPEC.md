@@ -9,8 +9,8 @@ Paste a job description into Claude Code. Get one folder, named from the JD, hol
 ## Terms
 
 - **Fact base**: `input/cv_facts.yaml`, the only approved source of CV evidence.
-- **Application**: the folder `output/applications/<YYYY-MM-DD>_<Company>_<Role>[_N]/` for one JD holding `cover_letter.txt`, `cv.docx`, `cv.pdf`, `jd.txt`, `run.json` (plus `brief.md` and `state.json` from `--prepare`, which the verifier ignores). **[assumed]**
-- **Declined JD**: a folder for a JD the owner chose to stop at the match gate; holds only `jd.txt` and `run.json`. **[assumed]**
+- **Application**: the folder `output/applications/<YYYY-MM-DD>_<Company>_<Role>[_N]/` for one JD holding `cover_letter.txt`, `cv.docx`, `cv.pdf`, `jd.txt`, `run.json` (plus `brief.md` and `state.json` from `--prepare`, which the verifier ignores). Owner-confirmed.
+- **Declined JD**: a folder for a JD the owner chose to stop at the match gate; holds only `jd.txt` and `run.json` (status `declined`), written by `apply.py --decline <jd_file>` when the owner stops. Owner-confirmed.
 - **Fit band**: STRONG / BORDERLINE / WEAK from the deterministic score margin. Report-only.
 - **Verified**: `verify_application` returns no failures.
 

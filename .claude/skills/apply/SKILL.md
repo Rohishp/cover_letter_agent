@@ -16,7 +16,7 @@ Turn a pasted job description into a verified application folder: `cover_letter.
 4. If it exits 3, the match gate rejected the JD and nothing was saved. The user decides, not the gate:
    - Show the match score and breakdown exactly as Python printed them, plus the threshold it fell short of. Add no scoring of your own.
    - Ask the user (AskUserQuestion) whether to continue anyway or stop.
-   - On continue, rerun step 3 with `--force`. On stop, end there. Never choose for them.
+   - On continue, rerun step 3 with `--force`. On stop, run `python apply.py --decline input/jd_current.txt` (it keeps a Declined JD folder with `jd.txt` and `run.json`) and end there. Never choose for them.
 5. Run `python apply.py --finish <Application folder>`. It writes the letter with the OpenAI writer, or from a draft when you pass `--draft <file>`, then runs the validators, evaluator, CV and PDF generation and `verify_application`. Exit 0 means verified; 1 means the run failed; 2 means a draft or the folder failed verification (the output lists why).
 6. Read the output and report, in a few lines:
    - **Status**: completed, rejected (user stopped) or failed.

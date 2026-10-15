@@ -376,3 +376,32 @@ def test_finish_leaves_the_prepare_snapshot_alone_and_persists_its_own_transitio
     assert (folder / "state.json").read_bytes() == before
     saved = json.loads((tmp_path / "data" / "states" / f"{run_id}.json").read_text(encoding="utf-8"))
     assert saved["status"] == "completed"
+
+
+def test_decline_after_a_weak_match_writes_a_declined_jd_folder_that_verifies(monkeypatch, tmp_path, facts):
+    _, code, _ = _prepare(monkeypatch, strength="not_evidenced")
+    assert code == apply.EXIT_REJECTED
+
+    assert apply.decline(JD_TEXT) == 0
+    (folder,) = (tmp_path / "output" / "applications").iterdir()
+
+    assert sorted(p.name for p in folder.iterdir()) == ["jd.txt", "run.json"]
+    assert _run_json(folder)["status"] == "declined" and _run_json(folder)["company_name"] == "Test Co"
+    assert (folder / "jd.txt").read_text(encoding="utf-8") == JD_TEXT
+    assert verify_application(folder, facts) == []
+
+
+def test_decline_never_overwrites_an_existing_folder(monkeypatch, tmp_path):
+    _openai(monkeypatch)
+    assert apply.decline(JD_TEXT) == 0 and apply.decline(JD_TEXT) == 0
+
+    assert len(list((tmp_path / "output" / "applications").iterdir())) == 2
+
+
+def test_decline_is_dispatched_and_takes_no_force(monkeypatch, tmp_path):
+    jd = tmp_path / "jd.txt"
+    jd.write_text(JD_TEXT, encoding="utf-8")
+    _openai(monkeypatch)
+
+    assert apply.main(["apply.py", "--decline", str(jd), "--force"]) == apply.EXIT_FAILED
+    assert apply.main(["apply.py", "--decline", str(jd)]) == 0

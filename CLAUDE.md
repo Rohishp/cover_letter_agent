@@ -59,6 +59,7 @@ Main path: `/apply` in Claude Code. Paste the JD; it saves it to `input/jd_curre
 ```
 python apply.py --prepare <jd_file> [--force]       # exit 3 = weak match, nothing saved
 python apply.py --finish <folder> [--draft <file>]
+python apply.py --decline <jd_file>                 # owner stopped at the gate: Declined JD folder
 python apply.py <jd_file> [--force]                  # both steps, OpenAI writer
 ```
 

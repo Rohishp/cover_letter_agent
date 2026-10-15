@@ -11,6 +11,7 @@ from control_plane.application_paths import APPLICATIONS_ROOT, resolve_applicati
 from control_plane.brief import build_brief
 from control_plane.cover_letter_containment import check_ungrounded_figures
 from control_plane.fact_base_coverage import underdescribed_requirements
+from control_plane.jd_cache import parse_jd_cached
 from control_plane.state import CoverLetterState
 from cv.facts import load_facts
 from cv.generate import build_cv_run_summary, generate_cv
@@ -91,6 +92,27 @@ def prepare(jd_text: str, force: bool = False) -> tuple[int, Path | None]:
     print(f"\nApplication folder: {folder}\nBrief:              {folder / 'brief.md'}")
 
     return 0, folder
+
+
+def decline(jd_text: str) -> int:
+    """The owner stopped at the match gate: keep a Declined JD folder (jd.txt + run.json) so the JD is on record."""
+
+    try:
+        parsed_jd, _ = parse_jd_cached(jd_text)  # a cache hit right after --prepare
+        folder = resolve_application_dir(parsed_jd.company_name, parsed_jd.job_title, date.today())
+        folder.mkdir(parents=True)
+    except Exception as error:
+        print(f"DECLINE FAILED: {redact(str(error))}")
+        return EXIT_FAILED
+
+    (folder / "jd.txt").write_text(jd_text, encoding="utf-8")
+    _write_json(folder / "run.json", {
+        "status": "declined", "declined_at": datetime.now().isoformat(),
+        "company_name": parsed_jd.company_name, "job_title": parsed_jd.job_title,
+    })
+    print(f"Declined JD folder: {folder}")
+
+    return 0
 
 
 def _load_prepared(folder: Path) -> tuple[dict, CoverLetterState]:
@@ -218,6 +240,9 @@ def main(argv: list[str]) -> int:
     if draft is not None:
         return _usage()
 
+    if len(args) == 2 and args[0] == "--decline":
+        return _usage() if force else decline(_read_jd(args[1]))
+
     if len(args) == 2 and args[0] == "--prepare":
         return prepare(_read_jd(args[1]), force)[0]
 
@@ -243,7 +268,8 @@ def _read_jd(path: str) -> str:
 def _usage() -> int:
     print("usage: python apply.py <jd_file> [--force]\n"
           "       python apply.py --prepare <jd_file> [--force]\n"
-          "       python apply.py --finish <application_folder> [--draft <letter_file>]", file=sys.stderr)
+          "       python apply.py --finish <application_folder> [--draft <letter_file>]\n"
+          "       python apply.py --decline <jd_file>", file=sys.stderr)
     return EXIT_FAILED
 
 
