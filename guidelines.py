@@ -1,3 +1,5 @@
+LETTER_LENGTH_RULE = "Keep the letter approximately 250-350 words across all paragraphs combined."
+
 GENERIC_HOOK_EXAMPLES = (
     "I am writing to apply",
     "I am writing to express my interest",

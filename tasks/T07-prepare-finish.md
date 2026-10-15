@@ -25,5 +25,6 @@ Done.
 - `pipeline.py` gained `run_prepare` / `run_finish` (stage list split; `run_pipeline` unchanged in behaviour). A draft is evaluated once and never retried there.
 - `--prepare` writes `jd.txt`, `brief.md` (`control_plane/brief.py`, rules imported from `guidelines.py`), `state.json` and `run.json` (`prepared`). Weak match without `--force`: nothing in `output/`.
 - `cv.pdf`: `generate_cv` already writes it next to `cv.docx`; `--finish` fails loudly (run.json `failed`) if it raises. `verify_application` and `SPEC.md` now require it; `tests/test_verify_folder.py` fails when it is missing.
-- `/apply` skill and `CLAUDE.md` updated. 443 tests green.
+- Code-review follow-up (quality + security) applied: finish guards, draft figure check, prepare error handling, shared `LETTER_LENGTH_RULE`, public `render_facts_with_ids`, key redaction on the CV error.
+- `/apply` skill and `CLAUDE.md` updated.
 - Surprising: the PreToolUse hook (T04) blocks shell commands that mention the letter filename next to a write operator, including my own edit scripts; used Write/Edit instead. The real CV render and a live OpenAI run are not exercised here (T08).

@@ -28,6 +28,12 @@ from models.match_schema import MatchAnalysis
 _API_KEY = re.compile(r"sk-[A-Za-z0-9_-]+")
 
 
+def redact(text: str) -> str:
+    """SDK errors can echo a (masked) API key; never persist or show it."""
+
+    return _API_KEY.sub("sk-***", text)
+
+
 @dataclass
 class Inputs:
     facts: CVFacts
@@ -198,8 +204,7 @@ def _execute(state: CoverLetterState, inputs: Inputs, stages: list) -> CoverLett
             if stage(state, inputs):
                 break
     except Exception as error:
-        # SDK errors can echo a (masked) API key; never persist or show it.
-        state.set_error(_API_KEY.sub("sk-***", str(error)))
+        state.set_error(redact(str(error)))
         save_state(state)
 
     return state

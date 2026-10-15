@@ -11,8 +11,9 @@ from control_plane.cover_letter_containment import (
 )
 from cv.containment import check_citation_specificity
 from cv.facts import CVFacts
-from cv.selector import _render_facts_with_ids
+from agents.fact_render import render_facts_with_ids
 from guidelines import (
+    LETTER_LENGTH_RULE,
     GENERIC_HOOK_EXAMPLES,
     JD_VOCABULARY_MIRRORING_GUIDANCE,
     TRADE_OFF_OWNERSHIP_GUIDANCE,
@@ -248,7 +249,7 @@ def _user_content(
         "- End with a concise professional CTA.\n"
         "- If the company name is missing, use 'Dear Hiring Team,' as a connective "
         "paragraph.\n"
-        "- Keep the letter approximately 250-350 words across all paragraphs combined."
+        f"- {LETTER_LENGTH_RULE}"
     )
 
 
@@ -325,7 +326,7 @@ def write_cover_letter(
     writer to invent a job role in the first place.
     """
 
-    facts_block = _render_facts_with_ids(facts)
+    facts_block = render_facts_with_ids(facts)
     known_organisations = get_known_organisations(facts, parsed_jd.company_name)
     real_held_titles = get_real_held_titles(facts)
     valid_ids = facts.all_ids()

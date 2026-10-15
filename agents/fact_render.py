@@ -1,4 +1,5 @@
 from cv.facts import CVFacts
+from cv.selector import _render_facts_with_ids as render_facts_with_ids  # noqa: F401  (public name)
 
 
 def render_facts(facts: CVFacts) -> str:

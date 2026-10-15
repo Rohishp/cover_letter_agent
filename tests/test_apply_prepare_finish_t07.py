@@ -10,11 +10,14 @@ import pytest
 
 import apply
 from agents.client import client
+from control_plane.cover_letter_containment import check_ungrounded_figures
+from control_plane.thresholds import MAX_COVER_LETTER_RETRIES
 from cv.selector import CVSelection
 from models.cover_letter_schema import CoverLetterDraft
 from models.eval_schema import CriterionScore, EvalResult
 
 from helpers import GOOD_LETTER
+from verify_application import verify_application
 from test_pipeline import GOOD, JD_TEXT, PARSED_JD, FakeOpenAI, _match
 
 FAILING_EVAL = EvalResult(
@@ -113,7 +116,9 @@ def test_finish_without_a_draft_uses_the_openai_writer(monkeypatch, fake_cv):
     fake = _openai(monkeypatch)
 
     assert apply.finish(folder) == 0
-    assert fake.of(CoverLetterDraft)  # the letter never names Python/Kubernetes, so the pipeline retries
+    # The letter never names Python/Kubernetes, so every attempt leaves a requirement unused and the
+    # pipeline retries up to its cap, then accepts the last letter.
+    assert len(fake.of(CoverLetterDraft)) == MAX_COVER_LETTER_RETRIES + 1
     assert (folder / "cover_letter.txt").read_text(encoding="utf-8").startswith("Dear Test Co team,")
 
 
@@ -184,3 +189,156 @@ def test_main_dispatch_and_usage(monkeypatch, tmp_path, fake_cv):
     assert apply.main(["apply.py", "--finish"]) == apply.EXIT_FAILED
     assert apply.main(["apply.py", "--draft"]) == apply.EXIT_FAILED
     assert apply.main(["apply.py", "--prepare", str(jd), "--draft", "x.txt"]) == apply.EXIT_FAILED
+    assert apply.main(["apply.py", "--finish", str(folder), "--force"]) == apply.EXIT_FAILED
+
+
+def test_a_missing_jd_file_exits_with_a_message_not_a_traceback(tmp_path):
+    with pytest.raises(SystemExit) as exit_info:
+        apply.main(["apply.py", "--prepare", str(tmp_path / "missing.txt")])
+
+    assert "cannot read JD file" in str(exit_info.value)
+
+
+def test_finish_with_the_real_verifier_fails_when_cv_pdf_is_missing(monkeypatch, fake_cv):
+    _, _, folder = _prepare(monkeypatch)
+    _openai(monkeypatch)
+
+    def generate_cv_without_pdf(facts, parsed_jd, out_path, **_):
+        out_path.write_bytes(b"docx")
+        return SimpleNamespace(page_count=1, content=None)
+
+    monkeypatch.setattr(apply, "generate_cv", generate_cv_without_pdf)
+    monkeypatch.setattr(apply, "verify_application", lambda f, facts: verify_application(f, facts, check_pages=False))
+
+    assert apply.finish(folder) == apply.EXIT_UNVERIFIED
+
+
+def test_prepare_survives_a_cv_selection_failure_and_leaves_no_folder(monkeypatch, tmp_path):
+    def boom(*_):
+        raise RuntimeError("selector down")
+
+    monkeypatch.setattr(apply, "select_cv_content", boom)
+    _openai(monkeypatch)
+
+    assert apply.prepare(JD_TEXT) == (apply.EXIT_FAILED, None)
+    assert not (tmp_path / "output").exists()
+
+
+def test_prepare_removes_a_half_made_folder_when_a_write_fails(monkeypatch, tmp_path):
+    def boom(*_):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(apply, "build_brief", boom)
+    _openai(monkeypatch)
+
+    assert apply.prepare(JD_TEXT) == (apply.EXIT_FAILED, None)
+    assert list((tmp_path / "output" / "applications").iterdir()) == []
+
+
+def _edit_state(folder, change):
+    path = folder / "state.json"
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    change(saved["state"])
+    path.write_text(json.dumps(saved), encoding="utf-8")
+
+
+@pytest.mark.parametrize("change", [
+    lambda s: s.update(status="rejected"),
+    lambda s: s.update(status="failed"),
+    lambda s: s.update(forced=True, match_gate_result="passed"),  # forced flag alone is not enough
+    lambda s: s.update(parsed_jd=None),
+])
+def test_finish_refuses_a_tampered_state_before_any_llm_call(monkeypatch, fake_cv, change):
+    _, _, folder = _prepare(monkeypatch)
+    fake = _openai(monkeypatch)
+    _edit_state(folder, lambda s: (s["match_analysis"].update(base_score=0, core_must_have_score=0), change(s)))
+
+    assert apply.finish(folder) == apply.EXIT_FAILED
+    assert fake.calls == []
+
+
+def test_finish_accepts_a_forced_weak_match_it_prepared(monkeypatch, fake_cv):
+    _, _, folder = _prepare(monkeypatch, strength="not_evidenced", force=True)
+    _openai(monkeypatch, strength="not_evidenced")
+
+    assert apply.finish(folder) == 0
+
+
+def test_finish_refuses_a_completed_application_and_leaves_it_untouched(monkeypatch, fake_cv):
+    _, _, folder = _prepare(monkeypatch)
+    _openai(monkeypatch)
+    assert apply.finish(folder) == 0
+    letter = (folder / "cover_letter.txt").read_text(encoding="utf-8")
+    fake = _openai(monkeypatch)
+
+    assert apply.finish(folder) == apply.EXIT_FAILED
+    assert fake.calls == []
+    assert (folder / "cover_letter.txt").read_text(encoding="utf-8") == letter
+
+
+def test_a_failed_run_can_be_finished_again_with_a_better_draft(monkeypatch, fake_cv):
+    _, _, folder = _prepare(monkeypatch)
+    draft = folder.parent / "draft.txt"
+    draft.write_text(GOOD_LETTER, encoding="utf-8")
+    _openai(monkeypatch, eval_result=FAILING_EVAL)
+    assert apply.finish(folder, draft) == apply.EXIT_FAILED
+
+    _openai(monkeypatch)
+
+    assert apply.finish(folder, draft) == 0
+    assert _run_json(folder)["status"] == "completed"
+
+
+def test_finish_refuses_a_folder_outside_the_applications_root(monkeypatch, tmp_path, fake_cv):
+    _, _, folder = _prepare(monkeypatch)
+    elsewhere = tmp_path / "elsewhere"
+    folder.rename(elsewhere)
+
+    assert apply.finish(elsewhere) == apply.EXIT_FAILED
+
+
+def test_finish_refuses_a_folder_without_state(tmp_path):
+    folder = tmp_path / "output" / "applications" / "2026-01-01_Acme_Engineer"
+    folder.mkdir(parents=True)
+
+    assert apply.finish(folder) == apply.EXIT_FAILED
+
+
+def test_a_draft_with_an_invented_figure_is_rejected_before_any_llm_call(monkeypatch, fake_cv):
+    _, _, folder = _prepare(monkeypatch)
+    fake = _openai(monkeypatch)
+    draft = folder.parent / "draft.txt"
+    draft.write_text(GOOD_LETTER.replace("thing one", "thing one for 9999 users"), encoding="utf-8")
+
+    assert apply.finish(folder, draft) == apply.EXIT_UNVERIFIED
+    assert fake.calls == []
+
+
+def test_a_figure_from_the_fact_base_or_the_jd_is_grounded():
+    assert check_ungrounded_figures("42 widgets, 10x, 3.5%", "Did 42 widgets. 10x faster. 3.5% lift.") == []
+    assert check_ungrounded_figures("42 widgets in 2031.", "Did 42 widgets.") == [
+        "figure '2031' is in neither the fact base nor the JD"
+    ]
+
+
+def test_a_draft_failure_message_reports_zero_retries(monkeypatch, fake_cv):
+    _, _, folder = _prepare(monkeypatch)
+    draft = folder.parent / "draft.txt"
+    draft.write_text(GOOD_LETTER, encoding="utf-8")
+    _openai(monkeypatch, eval_result=FAILING_EVAL)
+    apply.finish(folder, draft)
+
+    assert "after 0 retries" in _run_json(folder)["failure_reason"]
+
+
+def test_an_api_key_in_a_cv_error_is_redacted(monkeypatch, fake_cv):
+    _, _, folder = _prepare(monkeypatch)
+    _openai(monkeypatch)
+
+    def leaky(*_a, **_k):
+        raise RuntimeError("auth failed for sk-abc123_DEF")
+
+    monkeypatch.setattr(apply, "generate_cv", leaky)
+    apply.finish(folder)
+
+    assert "sk-abc123" not in _run_json(folder)["failure_reason"]

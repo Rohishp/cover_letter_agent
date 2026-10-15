@@ -305,3 +305,18 @@ def check_letter_structure(
         )
 
     return violations
+
+
+_FIGURE_RE = re.compile(r"\d[\d.,]*\d|\d")
+
+
+def check_ungrounded_figures(letter: str, source_text: str) -> list[str]:
+    """Numbers in a plain-text letter that appear in neither the fact base nor the JD (an invented figure)."""
+
+    known = {m.rstrip(".,") for m in _FIGURE_RE.findall(source_text)}
+
+    return [
+        f"figure {figure!r} is in neither the fact base nor the JD"
+        for figure in dict.fromkeys(m.rstrip(".,") for m in _FIGURE_RE.findall(letter))
+        if figure not in known
+    ]
