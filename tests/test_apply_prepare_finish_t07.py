@@ -342,3 +342,37 @@ def test_an_api_key_in_a_cv_error_is_redacted(monkeypatch, fake_cv):
     apply.finish(folder)
 
     assert "sk-abc123" not in _run_json(folder)["failure_reason"]
+
+
+def test_after_a_cv_failure_the_evaluated_letter_stays_and_a_rerun_completes(monkeypatch, tmp_path, fake_cv):
+    # The letter already passed evaluation, so it is kept (run.json says failed, so it is not
+    # presented as a finished Application); finishing again replaces it and the CV.
+    _, _, folder = _prepare(monkeypatch)
+    _openai(monkeypatch)
+    working_generate_cv = apply.generate_cv
+
+    def no_converter(*_a, **_k):
+        raise RuntimeError("no PDF converter available")
+
+    monkeypatch.setattr(apply, "generate_cv", no_converter)
+    assert apply.finish(folder) == apply.EXIT_FAILED
+    assert (folder / "cover_letter.txt").exists() and _run_json(folder)["status"] == "failed"
+
+    monkeypatch.setattr(apply, "generate_cv", working_generate_cv)
+
+    assert apply.finish(folder) == 0
+    assert _run_json(folder)["status"] == "completed" and (folder / "cv.pdf").stat().st_size > 0
+
+
+def test_finish_leaves_the_prepare_snapshot_alone_and_persists_its_own_transitions(monkeypatch, tmp_path, fake_cv):
+    # state.json is the snapshot every finish restarts from; invariant 4's per-transition
+    # record is the pipeline's own state file under data/states/<run_id>.json.
+    _, _, folder = _prepare(monkeypatch)
+    before = (folder / "state.json").read_bytes()
+    _openai(monkeypatch)
+    run_id = _run_json(folder)["run_id"]
+    assert apply.finish(folder) == 0
+
+    assert (folder / "state.json").read_bytes() == before
+    saved = json.loads((tmp_path / "data" / "states" / f"{run_id}.json").read_text(encoding="utf-8"))
+    assert saved["status"] == "completed"
