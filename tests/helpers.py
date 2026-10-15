@@ -20,6 +20,7 @@ def make_folder(tmp_path, name=NAME, status="completed", declined=False):
     if not declined:
         (folder / "cover_letter.txt").write_text(GOOD_LETTER, encoding="utf-8")
         Document().save(str(folder / "cv.docx"))
+        (folder / "cv.pdf").write_bytes(b"%PDF-1.4 test")
 
     return folder
 

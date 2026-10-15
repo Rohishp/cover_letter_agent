@@ -34,6 +34,7 @@ class Inputs:
     applied_for_role: str
     force: bool
     strongest_evidence: str | None
+    draft: str | None = None  # a letter written outside OpenAI: evaluated once, never retried here
 
 
 def _advance(state: CoverLetterState, status: PipelineStatus) -> None:
@@ -117,7 +118,7 @@ def _attempt(state: CoverLetterState, inputs: Inputs, requirement_evidence: dict
         if item["jd_requirement"] in requirement_evidence
     ]
 
-    state.cover_letter = write_cover_letter(
+    state.cover_letter = inputs.draft if inputs.draft is not None else write_cover_letter(
         facts=inputs.facts,
         parsed_jd=state.parsed_jd,
         match_analysis=state.match_analysis,
@@ -162,7 +163,7 @@ def write_and_evaluate(state: CoverLetterState, inputs: Inputs) -> bool:
 
     while True:
         passed = _attempt(state, inputs, requirement_evidence)
-        is_final = state.retry_count >= MAX_COVER_LETTER_RETRIES
+        is_final = inputs.draft is not None or state.retry_count >= MAX_COVER_LETTER_RETRIES
 
         # A residual underrepresented requirement on the final attempt still accepts
         # the letter: a missed-case risk, not a fabrication risk. It stays visible
@@ -177,7 +178,7 @@ def write_and_evaluate(state: CoverLetterState, inputs: Inputs) -> bool:
 
         if is_final:
             state.set_error(
-                f"Cover letter failed evaluation after {MAX_COVER_LETTER_RETRIES} "
+                f"Cover letter failed evaluation after {state.retry_count} "
                 f"retries. Final score: {state.eval_score}."
             )
             save_state(state)
@@ -188,6 +189,32 @@ def write_and_evaluate(state: CoverLetterState, inputs: Inputs) -> bool:
 
 
 STAGES = [parse_jd_stage, validate_jd, match_stage, gate, write_and_evaluate]
+PREPARE_STAGES, FINISH_STAGES = STAGES[:-1], STAGES[-1:]
+
+
+def _execute(state: CoverLetterState, inputs: Inputs, stages: list) -> CoverLetterState:
+    try:
+        for stage in stages:
+            if stage(state, inputs):
+                break
+    except Exception as error:
+        # SDK errors can echo a (masked) API key; never persist or show it.
+        state.set_error(_API_KEY.sub("sk-***", str(error)))
+        save_state(state)
+
+    return state
+
+
+def _run(jd_text: str, inputs: Inputs, stages: list) -> CoverLetterState:
+    state = CoverLetterState()
+    save_state(state)
+
+    def load_jd(state: CoverLetterState, _inputs: Inputs) -> bool:
+        state.raw_jd_text = jd_text.strip()
+        _advance(state, "jd_loaded")
+        return False
+
+    return _execute(state, inputs, [load_jd, *stages])
 
 
 def run_pipeline(
@@ -205,20 +232,22 @@ def run_pipeline(
     project as plain text, passed to the writer as a hint.
     """
 
-    state = CoverLetterState()
-    save_state(state)
-    inputs = Inputs(facts, applied_for_role, force, strongest_evidence)
+    return _run(jd_text, Inputs(facts, applied_for_role, force, strongest_evidence), STAGES)
 
-    try:
-        state.raw_jd_text = jd_text.strip()
-        _advance(state, "jd_loaded")
 
-        for stage in STAGES:
-            if stage(state, inputs):
-                break
-    except Exception as error:
-        # SDK errors can echo a (masked) API key; never persist or show it.
-        state.set_error(_API_KEY.sub("sk-***", str(error)))
-        save_state(state)
+def run_prepare(jd_text: str, facts: CVFacts, force: bool = False) -> CoverLetterState:
+    """The stages up to and including the gate. Ends "match_complete" (go), or "rejected" / "failed"."""
 
-    return state
+    return _run(jd_text, Inputs(facts, "", force, None), PREPARE_STAGES)
+
+
+def run_finish(
+    state: CoverLetterState,
+    facts: CVFacts,
+    applied_for_role: str,
+    strongest_evidence: str | None = None,
+    draft: str | None = None,
+) -> CoverLetterState:
+    """Write (or take `draft`) and evaluate for a state that run_prepare left at the gate."""
+
+    return _execute(state, Inputs(facts, applied_for_role, state.forced, strongest_evidence, draft), FINISH_STAGES)

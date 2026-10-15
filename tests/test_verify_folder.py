@@ -24,7 +24,7 @@ def test_collision_suffix_name_is_accepted(tmp_path, facts):
     assert verify_application(make_folder(tmp_path, name=NAME + "_2"), facts) == []
 
 
-@pytest.mark.parametrize("filename", ["cover_letter.txt", "cv.docx", "jd.txt", "run.json"])
+@pytest.mark.parametrize("filename", ["cover_letter.txt", "cv.docx", "cv.pdf", "jd.txt", "run.json"])
 def test_missing_file_fails(tmp_path, facts, filename):
     folder = make_folder(tmp_path)
     (folder / filename).unlink()
@@ -34,7 +34,7 @@ def test_missing_file_fails(tmp_path, facts, filename):
     assert f"{filename} is missing" in failures
 
 
-@pytest.mark.parametrize("filename", ["cover_letter.txt", "cv.docx", "jd.txt", "run.json"])
+@pytest.mark.parametrize("filename", ["cover_letter.txt", "cv.docx", "cv.pdf", "jd.txt", "run.json"])
 def test_empty_file_fails(tmp_path, facts, filename):
     folder = make_folder(tmp_path)
     (folder / filename).write_bytes(b"")

@@ -9,7 +9,7 @@ Paste a job description into Claude Code. Get one folder, named from the JD, hol
 ## Terms
 
 - **Fact base**: `input/cv_facts.yaml`, the only approved source of CV evidence.
-- **Application**: the folder `output/applications/<YYYY-MM-DD>_<Company>_<Role>[_N]/` for one JD holding `cover_letter.txt`, `cv.docx`, `jd.txt`, `run.json`. **[assumed]**
+- **Application**: the folder `output/applications/<YYYY-MM-DD>_<Company>_<Role>[_N]/` for one JD holding `cover_letter.txt`, `cv.docx`, `cv.pdf`, `jd.txt`, `run.json` (plus `brief.md` and `state.json` from `--prepare`, which the verifier ignores). **[assumed]**
 - **Declined JD**: a folder for a JD the owner chose to stop at the match gate; holds only `jd.txt` and `run.json`. **[assumed]**
 - **Fit band**: STRONG / BORDERLINE / WEAK from the deterministic score margin. Report-only.
 - **Verified**: `verify_application` returns no failures.
@@ -31,7 +31,7 @@ Kept modules and 198 tests pass in this folder. Done when `OPENAI_API_KEY=test p
 Interface: `verify_application(folder: Path, facts: CVFacts) -> list[str]` returns human-readable failures, empty means verified. CLI: `python verify_application.py <folder>` prints failures, exit 0 if none, 2 otherwise (so a hook can use it).
 
 Checks, all deterministic, reusing existing check functions where they exist:
-1. Folder name matches the pattern; the four files exist; none is empty.
+1. Folder name matches the pattern; the five files exist; none is empty.
 2. `run.json` parses and `status == "completed"` (Application) or the folder is a Declined JD (skip checks 3-6).
 3. Letter has no placeholders (`[...]`, `{{`, `TODO`, `<company>`) and passes `check_letter_structure`.
 4. Letter passes hedge-disclosure, fabricated-employer and fabricated-role checks against the fact base.

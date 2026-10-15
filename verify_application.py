@@ -28,7 +28,7 @@ from models.cover_letter_schema import CoverLetterDraft, CoverLetterParagraph
 _WORD = r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*"
 FOLDER_RE = re.compile(rf"^(\d{{4}}-\d{{2}}-\d{{2}})_({_WORD})_({_WORD})(_\d+)?$")
 
-APPLICATION_FILES = ("cover_letter.txt", "cv.docx", "jd.txt", "run.json")
+APPLICATION_FILES = ("cover_letter.txt", "cv.docx", "cv.pdf", "jd.txt", "run.json")
 DECLINED_FILES = ("jd.txt", "run.json")
 
 PLACEHOLDER_RE = re.compile(r"\[[^\]\n]*\]|\{\{|\bTODO\b|<[A-Za-z _-]+>")

@@ -20,4 +20,10 @@ Read `CLAUDE.md`, `SPEC.md`, `DECISIONS.md`, then this file. Do only this task.
 Everything not listed above; protected areas in `CLAUDE.md` (scoring weights, thresholds, `cv/` unless named).
 
 ## Result
-(not started)
+Done.
+- `apply.py` is back at the repo root: `--prepare <jd> [--force]`, `--finish <folder> [--draft <file>]`, and the bare `<jd>` form running both. Exit codes: 0 ok, 1 failed, 2 unverified/bad draft, 3 weak match.
+- `pipeline.py` gained `run_prepare` / `run_finish` (stage list split; `run_pipeline` unchanged in behaviour). A draft is evaluated once and never retried there.
+- `--prepare` writes `jd.txt`, `brief.md` (`control_plane/brief.py`, rules imported from `guidelines.py`), `state.json` and `run.json` (`prepared`). Weak match without `--force`: nothing in `output/`.
+- `cv.pdf`: `generate_cv` already writes it next to `cv.docx`; `--finish` fails loudly (run.json `failed`) if it raises. `verify_application` and `SPEC.md` now require it; `tests/test_verify_folder.py` fails when it is missing.
+- `/apply` skill and `CLAUDE.md` updated. 443 tests green.
+- Surprising: the PreToolUse hook (T04) blocks shell commands that mention the letter filename next to a write operator, including my own edit scripts; used Write/Edit instead. The real CV render and a live OpenAI run are not exercised here (T08).

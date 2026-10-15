@@ -12,7 +12,7 @@ pipeline's trust were carried over. 198 tests pass here (`OPENAI_API_KEY=test py
 - `.claude/skills/apply`, `CLAUDE.md` invariants, and the tests for all of the above
 
 ## In `_legacy/` for reference only (not imported)
-`apply.py`, `control_plane/reporting.py`, their tests (`pipeline.py` was rebuilt in T06).
+`state.py` (`pipeline.py` was rebuilt in T06; `apply.py` and `reporting.py` came back in T07).
 
 ## Known facts worth keeping
 - gpt-4o at temperature 0 still flips on vague core requirements (core score moves up to 13 points). A 3-run median did not help. Do not rebuild consensus matching; decompose vague requirements or let the user tag them.

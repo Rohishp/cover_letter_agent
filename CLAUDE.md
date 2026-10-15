@@ -50,12 +50,16 @@ control_plane/   deterministic code: scoring, gates, validation, caching, state,
 ## Running it
 
 Main path: `/apply` in Claude Code. Paste the JD; it saves it to `input/jd_current.txt` and runs
-`python apply.py input/jd_current.txt [--force]`, which writes `cover_letter.txt`, `cv.docx`,
-`jd.txt` and `run.json` to `output/applications/<date>_<Company>_<Role>/`. `apply.py` is the
-orchestrator: JD parse, CV selection, `run_pipeline`, then CV generation.
+`python apply.py --prepare input/jd_current.txt [--force]` then `python apply.py --finish <folder>
+[--draft <file>]`, which together write `cover_letter.txt`, `cv.docx`, `cv.pdf`, `jd.txt` and `run.json`
+(plus `brief.md` and `state.json` from `--prepare`) to `output/applications/<date>_<Company>_<Role>/`.
+`apply.py` is the orchestrator: `--prepare` = JD parse, match, gate, CV selection, brief; `--finish` = letter
+(draft, else the OpenAI writer), validators, evaluator, CV generation, `verify_application`.
 
 ```
-python apply.py <jd_file> [--force]   # local, both documents (main path)
+python apply.py --prepare <jd_file> [--force]       # exit 3 = weak match, nothing saved
+python apply.py --finish <folder> [--draft <file>]
+python apply.py <jd_file> [--force]                  # both steps, OpenAI writer
 ```
 
 A weak match is the user's call: `/apply` shows the score and asks whether to continue (rerun with
